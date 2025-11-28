@@ -100,7 +100,8 @@ jobs:
       - name: Upload audit artifact (before)
         uses: actions/upload-artifact@v4
         with:
-          name: ci-audit-before
+          # Make artifact name unique per matrix job to avoid conflicts when multiple jobs upload the same artifact name
+          name: ci-audit-before-${{ matrix.node-version }}
           path: ci-audit-before.txt
 
       - name: Create CI DB user and grant tightened privileges
@@ -179,7 +180,8 @@ jobs:
       - name: Upload audit artifact (after)
         uses: actions/upload-artifact@v4
         with:
-          name: ci-audit-after
+          # Include the matrix node-version so parallel matrix jobs don't collide
+          name: ci-audit-after-${{ matrix.node-version }}
           path: ci-audit-after.txt
 
       - name: Cleanup CI DB user
