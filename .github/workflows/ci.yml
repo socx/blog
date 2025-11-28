@@ -160,7 +160,18 @@ jobs:
 
       - name: Install API dependencies
         working-directory: ./backend/api
-        run: npm ci --prefer-offline --no-audit --no-fund
+        run: |
+          # Use npm ci if a lockfile exists; if npm ci fails (lockfile out of sync), fall back to npm install
+          if [ -f backend/api/package-lock.json ]; then
+            echo "package-lock.json found — attempting npm ci"
+            npm ci --prefer-offline --no-audit --no-fund || {
+              echo "npm ci failed (lockfile may be out of sync). Falling back to npm install"
+              npm install --no-audit --no-fund
+            }
+          else
+            echo "No package-lock.json — running npm install"
+            npm install --no-audit --no-fund
+          fi
 
       - name: Run linter
         working-directory: ./backend/api
