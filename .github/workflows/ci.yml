@@ -68,6 +68,42 @@ jobs:
           echo "MySQL did not become ready" >&2
           exit 1
 
+      - name: Detect MySQL client host
+        id: detect-host
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        run: |
+          # Detect the client host seen by MySQL for connections originating from the runner
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$MYSQL_ROOT_PASSWORD" -sN -e "SELECT SUBSTRING_INDEX(USER(),'@',-1);") || true
+          if [ -z "$CLIENT_HOST" ]; then
+            CLIENT_HOST=127.0.0.1
+          fi
+          echo "Detected client host: $CLIENT_HOST"
+          echo "client_host=$CLIENT_HOST" >> $GITHUB_OUTPUT
+
+      - name: Audit DB grants (before)
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          CLIENT_HOST: ${{ steps.detect-host.outputs.client_host }}
+        run: |
+          OUT_FILE=ci-audit-before.txt
+          echo "Auditing grants BEFORE creation for user '${DB_USER}' (sanitized)..." > "$OUT_FILE"
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            echo "--- ${USER_SPEC} ---" >> "$OUT_FILE"
+            # SHOW GRANTS may include password hashes; sanitize them and append to file
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
+              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" >> "$OUT_FILE" || echo "(no grants or user does not exist for ${USER_SPEC})" >> "$OUT_FILE"
+          done
+
+      - name: Upload audit artifact (before)
+        uses: actions/upload-artifact@v4
+        with:
+          # Make artifact name unique per matrix job to avoid conflicts when multiple jobs upload the same artifact name
+          name: ci-audit-before-${{ matrix.node-version }}
+          path: ci-audit-before.txt
+
       - name: Create CI DB user and grant tightened privileges
         env:
           ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
@@ -79,10 +115,15 @@ jobs:
           # We'll create the user for common client hosts and grant a minimal set of privileges
           # Note: do not include extra quotes in the format string — USER_SPEC includes the required quotes
           SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, REFERENCES ON \`${DB_NAME}\`.* TO %s;"
-          # Include '%' (any host) so the GitHub Actions runner (via docker bridge IP) is allowed to connect.
-          # Some runners connect from a docker bridge address like 172.18.0.1 which wouldn't match 127.0.0.1
-          # Granting to '%' is acceptable in the ephemeral CI environment.
-          for HOST in '%' '127.0.0.1' '::1' 'localhost'; do
+          # Detect the client host as seen by MySQL for connections originating from this runner.
+          # This returns an IP like 172.18.0.1 (docker bridge) when connecting via 127.0.0.1.
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e "SELECT SUBSTRING_INDEX(USER(),'@',-1);") || true
+          if [ -z "$CLIENT_HOST" ]; then
+            echo "Could not detect client host (falling back to 127.0.0.1)"
+            CLIENT_HOST=127.0.0.1
+          fi
+          echo "Detected client host: $CLIENT_HOST"
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
             USER_SPEC="'${DB_USER}'@'${HOST}'"
             CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} IDENTIFIED BY '${DB_PASS}';"
             GRANT_SQL=$(printf "$SQL_BASE" "${USER_SPEC}")
@@ -107,9 +148,36 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
 
+      - name: Install DB dependencies
+        run: |
+          # Try a clean install if a package-lock.json exists; otherwise fall back to npm install
+          if [ -f backend/db/package-lock.json ]; then
+            npm ci --prefix backend/db --no-audit --no-fund
+          else
+            echo "No lockfile found in backend/db — running npm install instead of npm ci"
+            npm install --prefix backend/db --no-audit --no-fund
+          fi
+
       - name: Install API dependencies
         working-directory: ./backend/api
-        run: npm ci --prefer-offline --no-audit --no-fund
+        run: |
+          # Use npm ci if a lockfile exists; if npm ci fails (lockfile out of sync), fall back to npm install
+          if [ -f backend/api/package-lock.json ]; then
+            echo "package-lock.json found — attempting npm ci"
+            npm ci --prefer-offline --no-audit --no-fund || {
+              echo "npm ci failed (lockfile may be out of sync). Falling back to npm install"
+              npm install --no-audit --no-fund
+            }
+          else
+            echo "No package-lock.json — running npm install"
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Run linter
+        working-directory: ./backend/api
+        run: |
+          echo "Running ESLint..."
+          npm run lint
 
       - name: Run tests
         working-directory: ./backend/api
@@ -119,6 +187,47 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
           DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
-          # Ensure modules installed under backend/api/node_modules are resolvable
-          NODE_PATH: ${{ github.workspace }}/backend/api/node_modules
         run: npm test
+
+      - name: Audit DB grants (after)
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          CLIENT_HOST: ${{ steps.detect-host.outputs.client_host }}
+        run: |
+          OUT_FILE=ci-audit-after.txt
+          echo "Auditing grants AFTER creation for user '${DB_USER}' (sanitized)..." > "$OUT_FILE"
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            echo "--- ${USER_SPEC} ---" >> "$OUT_FILE"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
+              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" >> "$OUT_FILE" || echo "(no grants or user does not exist for ${USER_SPEC})" >> "$OUT_FILE"
+          done
+
+      - name: Upload audit artifact (after)
+        uses: actions/upload-artifact@v4
+        with:
+          # Include the matrix node-version so parallel matrix jobs don't collide
+          name: ci-audit-after-${{ matrix.node-version }}
+          path: ci-audit-after.txt
+
+      - name: Cleanup CI DB user
+        if: always()
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+        run: |
+          echo "Cleaning up CI DB user (dropping created users)..."
+          # Detect the client host again (same method as creation) and drop that specific user
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e "SELECT SUBSTRING_INDEX(USER(),'@',-1);") || true
+          if [ -z "$CLIENT_HOST" ]; then
+            echo "Could not detect client host (falling back to 127.0.0.1)"
+            CLIENT_HOST=127.0.0.1
+          fi
+          echo "Detected client host for cleanup: $CLIENT_HOST"
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            SQL="DROP USER IF EXISTS ${USER_SPEC}; FLUSH PRIVILEGES;"
+            echo "$SQL"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "$SQL" || echo "Warning: failed to drop ${USER_SPEC}"
+          done
