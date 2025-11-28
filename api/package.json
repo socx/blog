@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test": "node ./bin/test-setup.js && NODE_ENV=test jest --runInBand"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -19,5 +20,14 @@
     "bcryptjs": "^2.4.3"
     ,
     "express-validator": "^7.0.1"
+  }
+  ,
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "supertest": "^6.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "verbose": true
   }
 }

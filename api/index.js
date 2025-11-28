@@ -7,7 +7,9 @@ const knexConfig = require('../knexfile');
 const Knex = require('knex');
 
 const env = process.env.NODE_ENV || 'development';
-const knex = Knex(knexConfig[env]);
+// fall back to development config if the environment key isn't present
+const knexConfigForEnv = knexConfig[env] || knexConfig.development;
+const knex = Knex(knexConfigForEnv);
 
 const app = express();
 app.use(helmet());
@@ -201,4 +203,9 @@ adminRouter.delete('/posts/:id', async (req, res) => {
 app.use('/api/v1/admin', authenticateJWT, requireAdmin, adminRouter);
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`API server listening on http://localhost:${port}`));
+if (require.main === module) {
+  app.listen(port, () => console.log(`API server listening on http://localhost:${port}`));
+}
+
+// export app and knex for testing
+module.exports = { app, knex };
