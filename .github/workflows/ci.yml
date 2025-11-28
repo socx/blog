@@ -148,6 +148,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
 
+      - name: Install DB dependencies
+        run: npm ci --prefix backend/db --no-audit --no-fund
+
       - name: Install API dependencies
         working-directory: ./backend/api
         run: npm ci --prefer-offline --no-audit --no-fund
