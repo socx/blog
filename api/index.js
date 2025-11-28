@@ -14,6 +14,7 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
+const { body, validationResult } = require('express-validator');
 
 // Health
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -75,31 +76,48 @@ function requireAdmin(req, res, next) {
 const adminRouter = express.Router();
 
 // Create post
-adminRouter.post('/posts', async (req, res) => {
-  const { title, slug, excerpt, content, status, published_at, featured_media_id } = req.body;
-  if (!title || !slug) return res.status(400).json({ error: 'title and slug are required' });
-  const now = new Date();
-  try {
-    const [id] = await knex('posts').insert({
-      author_id: req.user.id,
-      title,
-      slug,
-      excerpt: excerpt || null,
-      content: content || null,
-      featured_media_id: featured_media_id || null,
-      status: status || 'draft',
-      published_at: published_at ? new Date(published_at) : null,
-      created_at: now,
-      updated_at: now,
-    });
-    const post = await knex('posts').where({ id }).first();
-    res.status(201).json({ data: post });
-  } catch (err) {
-    console.error(err);
-    if (err && err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'slug already exists' });
-    res.status(500).json({ error: 'Failed to create post' });
+adminRouter.post(
+  '/posts',
+  [
+    body('title').isString().trim().isLength({ min: 3 }).withMessage('title must be at least 3 characters'),
+    body('slug')
+      .isString()
+      .trim()
+      .matches(/^[a-z0-9\-]+$/)
+      .withMessage('slug must be lowercase letters, numbers or hyphens'),
+    body('excerpt').optional({ nullable: true }).isString(),
+    body('content').optional({ nullable: true }).isString(),
+    body('status').optional().isIn(['draft', 'published', 'archived']).withMessage('invalid status'),
+    body('published_at').optional({ nullable: true }).isISO8601().toDate(),
+    body('featured_media_id').optional({ nullable: true }).isInt().toInt(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const { title, slug, excerpt, content, status, published_at, featured_media_id } = req.body;
+    const now = new Date();
+    try {
+      const [id] = await knex('posts').insert({
+        author_id: req.user.id,
+        title,
+        slug,
+        excerpt: excerpt || null,
+        content: content || null,
+        featured_media_id: featured_media_id || null,
+        status: status || 'draft',
+        published_at: published_at ? new Date(published_at) : null,
+        created_at: now,
+        updated_at: now,
+      });
+      const post = await knex('posts').where({ id }).first();
+      res.status(201).json({ data: post });
+    } catch (err) {
+      console.error(err);
+      if (err && err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'slug already exists' });
+      res.status(500).json({ error: 'Failed to create post' });
+    }
   }
-});
+);
 
 // List posts (admin view)
 adminRouter.get('/posts', async (req, res) => {
@@ -121,15 +139,38 @@ adminRouter.get('/posts/:id', async (req, res) => {
 // Update post
 adminRouter.put('/posts/:id', async (req, res) => {
   const { id } = req.params;
-  const allowed = ['title','slug','excerpt','content','status','published_at','featured_media_id'];
+  await Promise.resolve();
+  const validations = [
+    body('title').optional().isString().trim().isLength({ min: 3 }).withMessage('title must be at least 3 characters'),
+    body('slug')
+      .optional()
+      .isString()
+      .trim()
+      .matches(/^[a-z0-9\-]+$/)
+      .withMessage('slug must be lowercase letters, numbers or hyphens'),
+    body('excerpt').optional({ nullable: true }).isString(),
+    body('content').optional({ nullable: true }).isString(),
+    body('status').optional().isIn(['draft', 'published', 'archived']).withMessage('invalid status'),
+    body('published_at').optional({ nullable: true }).isISO8601().toDate(),
+    body('featured_media_id').optional({ nullable: true }).isInt().toInt(),
+  ];
+  // run validations
+  for (const v of validations) {
+    await v.run(req);
+  }
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+  const allowed = ['title', 'slug', 'excerpt', 'content', 'status', 'published_at', 'featured_media_id'];
   const updates = {};
   for (const k of allowed) if (Object.prototype.hasOwnProperty.call(req.body, k)) updates[k] = req.body[k];
   if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No updatable fields provided' });
   updates.updated_at = new Date();
-  if (updates.published_at === null) {
-    updates.published_at = null;
-  } else if (updates.published_at) {
-    updates.published_at = new Date(updates.published_at);
+  if (Object.prototype.hasOwnProperty.call(updates, 'published_at')) {
+    if (updates.published_at === null) {
+      updates.published_at = null;
+    } else if (updates.published_at) {
+      updates.published_at = new Date(updates.published_at);
+    }
   }
   try {
     const count = await knex('posts').where({ id }).update(updates);
