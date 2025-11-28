@@ -6,6 +6,64 @@ on:
   pull_request:
     branches: [ main ]
 
+# Reusable step anchors
+x-anchors:
+  checkout-step: &checkout-step
+    name: Checkout
+    uses: actions/checkout@v4
+  setup-node-step: &setup-node-step
+    name: Setup Node.js
+    uses: actions/setup-node@v4
+    with:
+      node-version: ${{ matrix.node-version }}
+      cache: 'npm'
+  cache-step: &cache-step
+    name: Cache npm and node_modules
+    uses: actions/cache@v4
+    with:
+      path: |
+        ~/.npm
+        backend/api/node_modules
+      key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
+      restore-keys: |
+        ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
+  install-api-step: &install-api-step
+    name: Install API dependencies
+    working-directory: ./backend/api
+    run: |
+      if [ -f backend/api/package-lock.json ]; then
+        npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
+      else
+        npm install --no-audit --no-fund
+      fi
+  install-db-step: &install-db-step
+    name: Install DB dependencies
+    run: |
+      if [ -f backend/db/package-lock.json ]; then
+        npm ci --prefix backend/db --no-audit --no-fund
+      else
+        echo "No lockfile found in backend/db — running npm install instead of npm ci"
+        npm install --prefix backend/db --no-audit --no-fund
+      fi
+  install-mysql-client-step: &install-mysql-client-step
+    name: Install mysql client
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y default-mysql-client
+  wait-mysql-step: &wait-mysql-step
+    name: Wait for MySQL to be ready
+    run: |
+      for i in $(seq 1 30); do
+        if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" --silent; then
+          echo "MySQL is ready"
+          exit 0
+        fi
+        echo "Waiting for MySQL... ($i/30)"
+        sleep 2
+      done
+      echo "MySQL did not become ready" >&2
+      exit 1
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -27,14 +85,8 @@ jobs:
           --health-retries=10
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+      - *checkout-step
+      - *setup-node-step
 
       - name: Check required secrets
         env:
@@ -50,23 +102,9 @@ jobs:
           if [ -z "$DB_NAME_TEST" ]; then echo "Required secret DB_NAME_TEST is missing"; missing=true; fi
           if [ "$missing" = true ]; then echo "One or more required secrets are missing. Set them in repo Settings → Secrets and variables → Actions."; exit 1; fi
 
-      - name: Install mysql client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y default-mysql-client
+      - *install-mysql-client-step
 
-      - name: Wait for MySQL to be ready
-        run: |
-          for i in $(seq 1 30); do
-            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" --silent; then
-              echo "MySQL is ready"
-              exit 0
-            fi
-            echo "Waiting for MySQL... ($i/30)"
-            sleep 2
-          done
-          echo "MySQL did not become ready" >&2
-          exit 1
+      - *wait-mysql-step
 
       - name: Detect MySQL client host
         id: detect-host
@@ -138,40 +176,11 @@ jobs:
               echo "$GRANTS" | grep -qi 'ALTER' || { echo "ERROR: ALTER privilege missing for ${USER_SPEC}"; exit 1; }
           done
 
-      - name: Cache npm and node_modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            backend/api/node_modules
-          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
+      - *cache-step
 
-      - name: Install DB dependencies
-        run: |
-          # Try a clean install if a package-lock.json exists; otherwise fall back to npm install
-          if [ -f backend/db/package-lock.json ]; then
-            npm ci --prefix backend/db --no-audit --no-fund
-          else
-            echo "No lockfile found in backend/db — running npm install instead of npm ci"
-            npm install --prefix backend/db --no-audit --no-fund
-          fi
+      - *install-db-step
 
-      - name: Install API dependencies
-        working-directory: ./backend/api
-        run: |
-          # Use npm ci if a lockfile exists; if npm ci fails (lockfile out of sync), fall back to npm install
-          if [ -f backend/api/package-lock.json ]; then
-            echo "package-lock.json found — attempting npm ci"
-            npm ci --prefer-offline --no-audit --no-fund || {
-              echo "npm ci failed (lockfile may be out of sync). Falling back to npm install"
-              npm install --no-audit --no-fund
-            }
-          else
-            echo "No package-lock.json — running npm install"
-            npm install --no-audit --no-fund
-          fi
+      - *install-api-step
 
       - name: Run linter
         working-directory: ./backend/api
@@ -253,64 +262,18 @@ jobs:
           --health-retries=10
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - *checkout-step
+      - *setup-node-step
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+      - *install-mysql-client-step
 
-      - name: Install mysql client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y default-mysql-client
+      - *wait-mysql-step
 
-      - name: Wait for MySQL to be ready
-        run: |
-          for i in $(seq 1 30); do
-            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" --silent; then
-              echo "MySQL is ready"
-              exit 0
-            fi
-            echo "Waiting for MySQL... ($i/30)"
-            sleep 2
-          done
-          echo "MySQL did not become ready" >&2
-          exit 1
+      - *cache-step
 
-      - name: Cache npm and node_modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            backend/api/node_modules
-          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
+      - *install-db-step
 
-      - name: Install DB dependencies
-        run: |
-          if [ -f backend/db/package-lock.json ]; then
-            npm ci --prefix backend/db --no-audit --no-fund
-          else
-            echo "No lockfile found in backend/db — running npm install instead of npm ci"
-            npm install --prefix backend/db --no-audit --no-fund
-          fi
-
-      - name: Install API dependencies
-        run: |
-          if [ -f backend/api/package-lock.json ]; then
-            echo "package-lock.json found — attempting npm ci"
-            npm ci --prefer-offline --no-audit --no-fund || {
-              echo "npm ci failed (lockfile may be out of sync). Falling back to npm install"
-              npm install --no-audit --no-fund
-            }
-          else
-            echo "No package-lock.json — running npm install"
-            npm install --no-audit --no-fund
-          fi
+      - *install-api-step
 
       - name: Run repo-root tests
         env:
@@ -338,33 +301,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - *checkout-step
+      - *setup-node-step
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+      - *cache-step
 
-      - name: Cache npm and node_modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            backend/api/node_modules
-          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
-
-      - name: Install API dependencies
-        working-directory: ./backend/api
-        run: |
-          if [ -f backend/api/package-lock.json ]; then
-            npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
-          else
-            npm install --no-audit --no-fund
-          fi
+      - *install-api-step
 
       - name: Run fast unit tests
         working-directory: ./backend/api
