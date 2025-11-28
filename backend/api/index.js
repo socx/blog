@@ -85,7 +85,7 @@ adminRouter.post(
     body('slug')
       .isString()
       .trim()
-      .matches(/^[a-z0-9\-]+$/)
+    .matches(/^[a-z0-9-]+$/)
       .withMessage('slug must be lowercase letters, numbers or hyphens'),
     body('excerpt').optional({ nullable: true }).isString(),
     body('content').optional({ nullable: true }).isString(),
@@ -148,7 +148,7 @@ adminRouter.put('/posts/:id', async (req, res) => {
       .optional()
       .isString()
       .trim()
-      .matches(/^[a-z0-9\-]+$/)
+    .matches(/^[a-z0-9-]+$/)
       .withMessage('slug must be lowercase letters, numbers or hyphens'),
     body('excerpt').optional({ nullable: true }).isString(),
     body('content').optional({ nullable: true }).isString(),

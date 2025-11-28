@@ -14,4 +14,12 @@
     "no-console": "off",
     "eqeqeq": ["error", "smart"]
   }
+
+  ,
+  "overrides": [
+    {
+      "files": ["**/*.test.js", "test/**/*.js"],
+      "env": { "jest": true }
+    }
+  ]
 }
