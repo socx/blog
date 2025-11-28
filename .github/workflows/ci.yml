@@ -77,7 +77,8 @@ jobs:
         run: |
           echo "Creating CI DB user if not exists and granting tightened privileges..."
           # We'll create the user for common client hosts and grant a minimal set of privileges
-          SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, REFERENCES ON \`${DB_NAME}\`.* TO '%s';"
+          # Note: do not include extra quotes in the format string — USER_SPEC includes the required quotes
+          SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, REFERENCES ON \`${DB_NAME}\`.* TO %s;"
           for HOST in '127.0.0.1' '::1' 'localhost'; do
             USER_SPEC="'${DB_USER}'@'${HOST}'"
             CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} IDENTIFIED BY '${DB_PASS}';"
