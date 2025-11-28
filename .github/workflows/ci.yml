@@ -79,10 +79,15 @@ jobs:
           # We'll create the user for common client hosts and grant a minimal set of privileges
           # Note: do not include extra quotes in the format string — USER_SPEC includes the required quotes
           SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, REFERENCES ON \`${DB_NAME}\`.* TO %s;"
-          # Include '%' (any host) so the GitHub Actions runner (via docker bridge IP) is allowed to connect.
-          # Some runners connect from a docker bridge address like 172.18.0.1 which wouldn't match 127.0.0.1
-          # Granting to '%' is acceptable in the ephemeral CI environment.
-          for HOST in '%' '127.0.0.1' '::1' 'localhost'; do
+          # Detect the client host as seen by MySQL for connections originating from this runner.
+          # This returns an IP like 172.18.0.1 (docker bridge) when connecting via 127.0.0.1.
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e "SELECT SUBSTRING_INDEX(USER(),'@',-1);") || true
+          if [ -z "$CLIENT_HOST" ]; then
+            echo "Could not detect client host (falling back to 127.0.0.1)"
+            CLIENT_HOST=127.0.0.1
+          fi
+          echo "Detected client host: $CLIENT_HOST"
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
             USER_SPEC="'${DB_USER}'@'${HOST}'"
             CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} IDENTIFIED BY '${DB_PASS}';"
             GRANT_SQL=$(printf "$SQL_BASE" "${USER_SPEC}")
@@ -128,7 +133,14 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
         run: |
           echo "Cleaning up CI DB user (dropping created users)..."
-          for HOST in '%' '127.0.0.1' '::1' 'localhost'; do
+          # Detect the client host again (same method as creation) and drop that specific user
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e "SELECT SUBSTRING_INDEX(USER(),'@',-1);") || true
+          if [ -z "$CLIENT_HOST" ]; then
+            echo "Could not detect client host (falling back to 127.0.0.1)"
+            CLIENT_HOST=127.0.0.1
+          fi
+          echo "Detected client host for cleanup: $CLIENT_HOST"
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
             USER_SPEC="'${DB_USER}'@'${HOST}'"
             SQL="DROP USER IF EXISTS ${USER_SPEC}; FLUSH PRIVILEGES;"
             echo "$SQL"
