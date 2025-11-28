@@ -155,6 +155,12 @@ jobs:
         working-directory: ./backend/api
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: Run linter
+        working-directory: ./backend/api
+        run: |
+          echo "Running ESLint..."
+          npm run lint
+
       - name: Run tests
         working-directory: ./backend/api
         env:
