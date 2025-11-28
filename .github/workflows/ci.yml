@@ -327,3 +327,46 @@ jobs:
       - name: Cleanup (no-op safe)
         if: always()
         run: echo "repo-root-test finished"
+
+  unit-tests:
+    name: Unit tests (fast, no DB)
+    runs-on: ubuntu-latest
+    # single node version to keep the job lightweight
+    strategy:
+      matrix:
+        node-version: [20]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Cache npm and node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            backend/api/node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
+
+      - name: Install API dependencies
+        working-directory: ./backend/api
+        run: |
+          if [ -f backend/api/package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Run fast unit tests
+        working-directory: ./backend/api
+        # Run only the unit tests under test/unit to avoid starting DB setup/teardown
+        run: npx jest --testPathPattern "test/unit" --runInBand
