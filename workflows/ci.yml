@@ -52,9 +52,19 @@ jobs:
             sleep 2;
           done
 
+      - name: Cache npm and node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            blog/api/node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('blog/api/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
+
       - name: Install API dependencies
         working-directory: ./blog/api
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Run tests
         working-directory: ./blog/api
