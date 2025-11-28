@@ -9,7 +9,7 @@ require('dotenv').config();
 const path = require('path');
 const Knex = require('knex');
 const mysql = require('mysql2/promise');
-const knexfile = require(path.resolve(__dirname, '..', '..', 'knexfile'));
+const knexfile = require(path.resolve(__dirname, '..', '..', 'db', 'knexfile'));
 
 async function ensureTestDatabase() {
   const host = process.env.DB_HOST || '127.0.0.1';
@@ -29,8 +29,8 @@ async function runMigrationsAndSeeds() {
   const rawConfig = knexfile[env] || knexfile.development;
   // ensure migrations/seeds directories are absolute (knex resolves relative to cwd)
   const config = Object.assign({}, rawConfig, {
-    migrations: Object.assign({}, rawConfig.migrations, { directory: path.resolve(__dirname, '..', '..', 'migrations') }),
-    seeds: Object.assign({}, rawConfig.seeds, { directory: path.resolve(__dirname, '..', '..', 'seeds') }),
+    migrations: Object.assign({}, rawConfig.migrations, { directory: path.resolve(__dirname, '..', '..', 'db', 'migrations') }),
+    seeds: Object.assign({}, rawConfig.seeds, { directory: path.resolve(__dirname, '..', '..', 'db', 'seeds') }),
   });
   const knex = Knex(config);
   try {

@@ -96,17 +96,17 @@ jobs:
         with:
           path: |
             ~/.npm
-            blog/api/node_modules
-          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('blog/api/package-lock.json') }}
+            backend/api/node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
 
       - name: Install API dependencies
-        working-directory: ./blog/api
+        working-directory: ./backend/api
         run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Run tests
-        working-directory: ./blog/api
+        working-directory: ./backend/api
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306

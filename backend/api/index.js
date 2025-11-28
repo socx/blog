@@ -3,7 +3,7 @@ const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cors = require('cors');
-const knexConfig = require('../knexfile');
+const knexConfig = require('../db/knexfile');
 const Knex = require('knex');
 
 const env = process.env.NODE_ENV || 'development';

@@ -2,33 +2,35 @@
 
 High-level specification and user stories drafted in `specification.md` and `user_stories.md`.
 
-## Local dev: migrations and seeds
+## Local dev: migrations, seeds and running the API
 
-This repo uses Knex migrations/seeds for the API database (MySQL). Quick steps:
+The repository was reorganized: the server code lives under `backend/api` and DB migrations/seeds under `backend/db`.
 
-1. Copy `.env.example` to `.env` and set your DB credentials.
-2. Install dependencies:
+Quickstart (local machine)
 
-```bash
-cd blog
-npm install
-```
+1. Copy `.env.example` to `.env` and set your DB credentials (DB_HOST/DB_USER/DB_PASS/DB_NAME etc.).
 
-3. Run migrations and seeds:
+2. Install API dependencies:
 
 ```bash
-npm run migrate
-npm run seed
+cd backend/api
+npm ci
 ```
 
-If you prefer to use `npx` directly:
+3. Start MySQL (Docker Compose) and run migrations/seeds from the repo root (recommended):
 
 ```bash
-npx knex migrate:latest --knexfile knexfile.js
-npx knex seed:run --knexfile knexfile.js
+# bring up the DB + API dev container (API will mount your source)
+docker compose -f devops/docker-compose.dev.yml up -d db
+
+# run migrations and seeds (from repo root)
+npx knex migrate:latest --knexfile backend/db/knexfile.js
+npx knex seed:run --knexfile backend/db/knexfile.js
 ```
 
-Note: seeds create a default admin user using `ADMIN_EMAIL` and `ADMIN_PASSWORD` from your environment.
+Notes:
+- The `knexfile` is now at `backend/db/knexfile.js` so use `--knexfile` when invoking `knex` from the repo root.
+- Seeds create a default admin user using `ADMIN_EMAIL` and `ADMIN_PASSWORD` from your environment.
 
 ## CI / GitHub Actions secrets
 
@@ -50,47 +52,41 @@ For local testing you can set these env vars in your `.env` or run the test setu
 
 ```bash
 # create test DB and run migrations+seeds
-node api/bin/test-setup.js
+node backend/api/bin/test-setup.js
 
 # run tests
-NODE_ENV=test cd api && npm test
+NODE_ENV=test cd backend/api && npm test
 
 # optionally drop test DB when done
-node api/bin/test-teardown.js
+node backend/api/bin/test-teardown.js
 ```
 
 ## Local development with Docker Compose
 
-There's a `docker-compose.dev.yml` in the repo root (`blog/docker-compose.dev.yml`) that starts a MySQL container and runs the API in a Node container (bind-mounted to your working directory for live reload).
+There's a `docker-compose.dev.yml` in the repo root (`blog/docker-compose.dev.yml`) that starts a MySQL container and runs the API in a Node container (the API service builds using `backend/api` and bind-mounts your source for live reload).
 
 1. Copy `.env.example` to `.env` and adjust values if you like (especially `DB_*` and admin credentials).
 
-2. Start services:
+2. Start services (from repo root):
 
 ```bash
-cd blog
-docker compose -f docker-compose.dev.yml up
+docker compose -f devops/docker-compose.dev.yml up
 ```
 
-The API will be available at http://localhost:4000.
+The API will be available at http://localhost:4000 (when running).
 
 Notes:
 - The compose file uses environment variables from your shell or `.env` file. Defaults are provided in the YAML for convenience but you should set secure values locally.
-- Run migrations from your host (recommended) while the DB container is running:
-
-```bash
-cd blog
-npm run migrate
-```
-
+- Run migrations from your host (recommended) while the DB container is running (see commands above).
 - To run the admin/test flow quickly inside the running API container, you can open a shell:
 
+# use the devops compose file path when running from repo root
 ```bash
-docker compose -f docker-compose.dev.yml exec api sh
+docker compose -f devops/docker-compose.dev.yml exec api sh
 # then inside the container:
-npm run migrate
+npm run migrate # if you have the knex CLI available in the container
 npm run seed
-node ./index.js # or npm run dev already runs the server
+node ./index.js # or npm run dev
 ```
 
 
