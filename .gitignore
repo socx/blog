@@ -1,6 +1,9 @@
 node_modules/
 dist/
+.documentation.md
 .env
+.env*.local
+.env.example
 .DS_Store
 .vscode/
 coverage/

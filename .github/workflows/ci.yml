@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.DB_NAME_TEST }}
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Check required secrets
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
+        run: |
+          missing=false
+          if [ -z "$MYSQL_ROOT_PASSWORD" ]; then echo "Required secret MYSQL_ROOT_PASSWORD is missing"; missing=true; fi
+          if [ -z "$DB_USER" ]; then echo "Required secret DB_USER is missing"; missing=true; fi
+          if [ -z "$DB_PASS" ]; then echo "Required secret DB_PASS is missing"; missing=true; fi
+          if [ -z "$DB_NAME_TEST" ]; then echo "Required secret DB_NAME_TEST is missing"; missing=true; fi
+          if [ "$missing" = true ]; then echo "One or more required secrets are missing. Set them in repo Settings → Secrets and variables → Actions."; exit 1; fi
+
+      - name: Install mysql client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+
+      - name: Wait for MySQL to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" --silent; then
+              echo "MySQL is ready"
+              exit 0
+            fi
+            echo "Waiting for MySQL... ($i/30)"
+            sleep 2
+          done
+          echo "MySQL did not become ready" >&2
+          exit 1
+
+      - name: Create CI DB user and grant tightened privileges
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME: ${{ secrets.DB_NAME_TEST }}
+        run: |
+          echo "Creating CI DB user if not exists and granting tightened privileges..."
+          # We'll create the user for common client hosts and grant a minimal set of privileges
+          # Note: do not include extra quotes in the format string — USER_SPEC includes the required quotes
+          SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, REFERENCES ON \`${DB_NAME}\`.* TO %s;"
+          # Include '%' (any host) so the GitHub Actions runner (via docker bridge IP) is allowed to connect.
+          # Some runners connect from a docker bridge address like 172.18.0.1 which wouldn't match 127.0.0.1
+          # Granting to '%' is acceptable in the ephemeral CI environment.
+          for HOST in '%' '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} IDENTIFIED BY '${DB_PASS}';"
+            GRANT_SQL=$(printf "$SQL_BASE" "${USER_SPEC}")
+            FULL_SQL="$CREATE_SQL $GRANT_SQL FLUSH PRIVILEGES;"
+              echo "$FULL_SQL"
+              mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "$FULL_SQL"
+              # Verify grants: ensure DROP is not present and key privileges exist
+              GRANTS=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};")
+              echo "Grants for ${USER_SPEC}: $GRANTS"
+              echo "$GRANTS" | grep -qi 'DROP' && { echo "ERROR: DROP privilege present for ${USER_SPEC}"; exit 1; }
+              echo "$GRANTS" | grep -qi 'CREATE' || { echo "ERROR: CREATE privilege missing for ${USER_SPEC}"; exit 1; }
+              echo "$GRANTS" | grep -qi 'ALTER' || { echo "ERROR: ALTER privilege missing for ${USER_SPEC}"; exit 1; }
+          done
+
+      - name: Cache npm and node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            backend/api/node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
+
+      - name: Install API dependencies
+        working-directory: ./backend/api
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Run tests
+        working-directory: ./backend/api
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
+          # Ensure modules installed under backend/api/node_modules are resolvable
+          NODE_PATH: ${{ github.workspace }}/backend/api/node_modules
+        run: npm test
