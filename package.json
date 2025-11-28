@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test": "npm --prefix backend/api test",
+    "test:api": "npm --prefix backend/api test",
+    "lint:api": "npm --prefix backend/api run lint",
     "prepare-db": "node create_db.js",
     "migrate": "node create_db.js && npx knex migrate:latest --knexfile knexfile.js",
     "rollback": "npx knex migrate:rollback --knexfile knexfile.js",

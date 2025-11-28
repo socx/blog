@@ -231,3 +231,99 @@ jobs:
             echo "$SQL"
             mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "$SQL" || echo "Warning: failed to drop ${USER_SPEC}"
           done
+
+  repo-root-test:
+    name: Repo-root test (runs `npm test` at repo root)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.DB_NAME_TEST }}
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install mysql client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+
+      - name: Wait for MySQL to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" --silent; then
+              echo "MySQL is ready"
+              exit 0
+            fi
+            echo "Waiting for MySQL... ($i/30)"
+            sleep 2
+          done
+          echo "MySQL did not become ready" >&2
+          exit 1
+
+      - name: Cache npm and node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            backend/api/node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-npm-${{ hashFiles('backend/api/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
+
+      - name: Install DB dependencies
+        run: |
+          if [ -f backend/db/package-lock.json ]; then
+            npm ci --prefix backend/db --no-audit --no-fund
+          else
+            echo "No lockfile found in backend/db — running npm install instead of npm ci"
+            npm install --prefix backend/db --no-audit --no-fund
+          fi
+
+      - name: Install API dependencies
+        run: |
+          if [ -f backend/api/package-lock.json ]; then
+            echo "package-lock.json found — attempting npm ci"
+            npm ci --prefer-offline --no-audit --no-fund || {
+              echo "npm ci failed (lockfile may be out of sync). Falling back to npm install"
+              npm install --no-audit --no-fund
+            }
+          else
+            echo "No package-lock.json — running npm install"
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Run repo-root tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        run: |
+          # Run the repo-level test script which invokes backend/api tests
+          npm test
+
+      - name: Cleanup (no-op safe)
+        if: always()
+        run: echo "repo-root-test finished"
