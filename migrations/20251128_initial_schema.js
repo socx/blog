@@ -25,7 +25,8 @@ exports.up = async function(knex) {
 
   await knex.schema.createTable('posts', (t) => {
     t.increments('id').primary();
-    t.integer('author_id').unsigned().notNullable().references('id').inTable('users').onDelete('SET NULL');
+    // author_id should be nullable to allow ON DELETE SET NULL behavior
+    t.integer('author_id').unsigned().nullable().references('id').inTable('users').onDelete('SET NULL');
     t.string('title', 1024).notNullable();
     t.string('slug', 255).notNullable().unique();
     t.text('excerpt');

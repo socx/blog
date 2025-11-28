@@ -1,0 +1,26 @@
+require('dotenv').config();
+const mysql = require('mysql2/promise');
+
+async function resetDatabase() {
+  const host = process.env.DB_HOST || '127.0.0.1';
+  const port = process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306;
+  const user = process.env.DB_USER || 'root';
+  const password = process.env.DB_PASS || '';
+  const dbName = process.env.DB_NAME || 'faithstories_dev';
+
+  console.log(`Connecting to MySQL ${host}:${port} as ${user} to drop and recreate database '${dbName}'...`);
+  let connection;
+  try {
+    connection = await mysql.createConnection({ host, port, user, password });
+    await connection.query(`DROP DATABASE IF EXISTS \`${dbName}\`;`);
+    await connection.query(`CREATE DATABASE \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+    console.log(`Database '${dbName}' recreated.`);
+  } catch (err) {
+    console.error('Failed to reset database:', err.message || err);
+    process.exit(1);
+  } finally {
+    if (connection) await connection.end();
+  }
+}
+
+resetDatabase();

@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "migrate": "npx knex migrate:latest --knexfile knexfile.js",
+    "prepare-db": "node create_db.js",
+    "migrate": "node create_db.js && npx knex migrate:latest --knexfile knexfile.js",
     "rollback": "npx knex migrate:rollback --knexfile knexfile.js",
     "seed": "npx knex seed:run --knexfile knexfile.js"
   },
