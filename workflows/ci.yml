@@ -16,8 +16,8 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: faithstories_test
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.DB_NAME_TEST }}
         ports:
           - 3306:3306
         options: >-
@@ -36,6 +36,20 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
+      - name: Check required secrets
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
+        run: |
+          missing=false
+          if [ -z "$MYSQL_ROOT_PASSWORD" ]; then echo "Required secret MYSQL_ROOT_PASSWORD is missing"; missing=true; fi
+          if [ -z "$DB_USER" ]; then echo "Required secret DB_USER is missing"; missing=true; fi
+          if [ -z "$DB_PASS" ]; then echo "Required secret DB_PASS is missing"; missing=true; fi
+          if [ -z "$DB_NAME_TEST" ]; then echo "Required secret DB_NAME_TEST is missing"; missing=true; fi
+          if [ "$missing" = true ]; then echo "One or more required secrets are missing. Set them in repo Settings → Secrets and variables → Actions."; exit 1; fi
+
       - name: Install mysql client
         run: |
           sudo apt-get update
@@ -51,6 +65,17 @@ jobs:
             echo "Waiting for MySQL... ($i)";
             sleep 2;
           done
+
+      - name: Create CI DB user and grant privileges
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME: ${{ secrets.DB_NAME_TEST }}
+        run: |
+          echo "Creating CI DB user if not exists and granting privileges..."
+          # Use the mysql client to create user and grant privileges on the test DB
+          mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASS'; GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%'; FLUSH PRIVILEGES;"
 
       - name: Cache npm and node_modules
         uses: actions/cache@v4
@@ -71,7 +96,7 @@ jobs:
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_USER: root
-          DB_PASS: root
-          DB_NAME_TEST: faithstories_test
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
         run: npm test
