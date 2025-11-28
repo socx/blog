@@ -59,3 +59,38 @@ NODE_ENV=test cd api && npm test
 node api/bin/test-teardown.js
 ```
 
+## Local development with Docker Compose
+
+There's a `docker-compose.dev.yml` in the repo root (`blog/docker-compose.dev.yml`) that starts a MySQL container and runs the API in a Node container (bind-mounted to your working directory for live reload).
+
+1. Copy `.env.example` to `.env` and adjust values if you like (especially `DB_*` and admin credentials).
+
+2. Start services:
+
+```bash
+cd blog
+docker compose -f docker-compose.dev.yml up
+```
+
+The API will be available at http://localhost:4000.
+
+Notes:
+- The compose file uses environment variables from your shell or `.env` file. Defaults are provided in the YAML for convenience but you should set secure values locally.
+- Run migrations from your host (recommended) while the DB container is running:
+
+```bash
+cd blog
+npm run migrate
+```
+
+- To run the admin/test flow quickly inside the running API container, you can open a shell:
+
+```bash
+docker compose -f docker-compose.dev.yml exec api sh
+# then inside the container:
+npm run migrate
+npm run seed
+node ./index.js # or npm run dev already runs the server
+```
+
+
