@@ -120,3 +120,17 @@ jobs:
           DB_PASS: ${{ secrets.DB_PASS }}
           DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
         run: npm test
+
+      - name: Cleanup CI DB user
+        if: always()
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+        run: |
+          echo "Cleaning up CI DB user (dropping created users)..."
+          for HOST in '%' '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            SQL="DROP USER IF EXISTS ${USER_SPEC}; FLUSH PRIVILEGES;"
+            echo "$SQL"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "$SQL" || echo "Warning: failed to drop ${USER_SPEC}"
+          done
