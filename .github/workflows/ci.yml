@@ -68,6 +68,34 @@ jobs:
           echo "MySQL did not become ready" >&2
           exit 1
 
+      - name: Detect MySQL client host
+        id: detect-host
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        run: |
+          # Detect the client host seen by MySQL for connections originating from the runner
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$MYSQL_ROOT_PASSWORD" -sN -e "SELECT SUBSTRING_INDEX(USER(),'@',-1);") || true
+          if [ -z "$CLIENT_HOST" ]; then
+            CLIENT_HOST=127.0.0.1
+          fi
+          echo "Detected client host: $CLIENT_HOST"
+          echo "client_host=$CLIENT_HOST" >> $GITHUB_OUTPUT
+
+      - name: Audit DB grants (before)
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          CLIENT_HOST: ${{ steps.detect-host.outputs.client_host }}
+        run: |
+          echo "Auditing grants BEFORE creation for user '${DB_USER}' (sanitized)..."
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            echo "--- ${USER_SPEC} ---"
+            # SHOW GRANTS may include password hashes; sanitize them
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
+              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" || echo "(no grants or user does not exist for ${USER_SPEC})"
+          done
+
       - name: Create CI DB user and grant tightened privileges
         env:
           ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
@@ -125,6 +153,20 @@ jobs:
           DB_PASS: ${{ secrets.DB_PASS }}
           DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
         run: npm test
+
+      - name: Audit DB grants (after)
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          CLIENT_HOST: ${{ steps.detect-host.outputs.client_host }}
+        run: |
+          echo "Auditing grants AFTER creation for user '${DB_USER}' (sanitized)..."
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            echo "--- ${USER_SPEC} ---"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
+              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" || echo "(no grants or user does not exist for ${USER_SPEC})"
+          done
 
       - name: Cleanup CI DB user
         if: always()
