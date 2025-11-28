@@ -66,16 +66,30 @@ jobs:
             sleep 2;
           done
 
-      - name: Create CI DB user and grant privileges
+      - name: Create CI DB user and grant tightened privileges
         env:
           ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
           DB_NAME: ${{ secrets.DB_NAME_TEST }}
         run: |
-          echo "Creating CI DB user if not exists and granting privileges..."
-          # Use the mysql client to create user and grant privileges on the test DB
-          mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASS'; GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%'; FLUSH PRIVILEGES;"
+          echo "Creating CI DB user if not exists and granting tightened privileges..."
+          # We'll create the user for common client hosts and grant a minimal set of privileges
+          SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, REFERENCES ON \`${DB_NAME}\`.* TO '%s';"
+          for HOST in '127.0.0.1' '::1' 'localhost'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} IDENTIFIED BY '${DB_PASS}';"
+            GRANT_SQL=$(printf "$SQL_BASE" "${USER_SPEC}")
+            FULL_SQL="$CREATE_SQL $GRANT_SQL FLUSH PRIVILEGES;"
+              echo "$FULL_SQL"
+              mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "$FULL_SQL"
+              # Verify grants: ensure DROP is not present and key privileges exist
+              GRANTS=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};")
+              echo "Grants for ${USER_SPEC}: $GRANTS"
+              echo "$GRANTS" | grep -qi 'DROP' && { echo "ERROR: DROP privilege present for ${USER_SPEC}"; exit 1; }
+              echo "$GRANTS" | grep -qi 'CREATE' || { echo "ERROR: CREATE privilege missing for ${USER_SPEC}"; exit 1; }
+              echo "$GRANTS" | grep -qi 'ALTER' || { echo "ERROR: ALTER privilege missing for ${USER_SPEC}"; exit 1; }
+          done
 
       - name: Cache npm and node_modules
         uses: actions/cache@v4
