@@ -1,0 +1,53 @@
+openapi: 3.0.3
+info:
+  title: FaithStories API
+  version: 0.1.0
+servers:
+  - url: http://localhost:4000/api
+paths:
+  /v1/posts:
+    get:
+      summary: List published posts
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /v1/posts/{slug}:
+    get:
+      summary: Get a post by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not Found
+  /v1/auth/login:
+    post:
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Token
