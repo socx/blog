@@ -119,6 +119,4 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
           DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
-          # Ensure modules installed under backend/api/node_modules are resolvable
-          NODE_PATH: ${{ github.workspace }}/backend/api/node_modules
         run: npm test
