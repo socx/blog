@@ -149,7 +149,14 @@ jobs:
             ${{ runner.os }}-node-${{ matrix.node-version }}-npm-
 
       - name: Install DB dependencies
-        run: npm ci --prefix backend/db --no-audit --no-fund
+        run: |
+          # Try a clean install if a package-lock.json exists; otherwise fall back to npm install
+          if [ -f backend/db/package-lock.json ]; then
+            npm ci --prefix backend/db --no-audit --no-fund
+          else
+            echo "No lockfile found in backend/db — running npm install instead of npm ci"
+            npm install --prefix backend/db --no-audit --no-fund
+          fi
 
       - name: Install API dependencies
         working-directory: ./backend/api
