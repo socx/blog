@@ -23,7 +23,7 @@ describe('Auth edge cases', () => {
     // create a regular user in the test DB
     const password = 'regular-pass';
     const hash = await bcrypt.hash(password, 10);
-    const [id] = await knex('users').insert({
+    await knex('users').insert({
       name: 'Regular',
       email: 'user-integration@example.com',
       password_hash: hash,
