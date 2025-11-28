@@ -87,14 +87,21 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           CLIENT_HOST: ${{ steps.detect-host.outputs.client_host }}
         run: |
-          echo "Auditing grants BEFORE creation for user '${DB_USER}' (sanitized)..."
+          OUT_FILE=ci-audit-before.txt
+          echo "Auditing grants BEFORE creation for user '${DB_USER}' (sanitized)..." > "$OUT_FILE"
           for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
             USER_SPEC="'${DB_USER}'@'${HOST}'"
-            echo "--- ${USER_SPEC} ---"
-            # SHOW GRANTS may include password hashes; sanitize them
+            echo "--- ${USER_SPEC} ---" >> "$OUT_FILE"
+            # SHOW GRANTS may include password hashes; sanitize them and append to file
             mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
-              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" || echo "(no grants or user does not exist for ${USER_SPEC})"
+              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" >> "$OUT_FILE" || echo "(no grants or user does not exist for ${USER_SPEC})" >> "$OUT_FILE"
           done
+
+      - name: Upload audit artifact (before)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-audit-before
+          path: ci-audit-before.txt
 
       - name: Create CI DB user and grant tightened privileges
         env:
@@ -160,13 +167,20 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           CLIENT_HOST: ${{ steps.detect-host.outputs.client_host }}
         run: |
-          echo "Auditing grants AFTER creation for user '${DB_USER}' (sanitized)..."
+          OUT_FILE=ci-audit-after.txt
+          echo "Auditing grants AFTER creation for user '${DB_USER}' (sanitized)..." > "$OUT_FILE"
           for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
             USER_SPEC="'${DB_USER}'@'${HOST}'"
-            echo "--- ${USER_SPEC} ---"
+            echo "--- ${USER_SPEC} ---" >> "$OUT_FILE"
             mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
-              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" || echo "(no grants or user does not exist for ${USER_SPEC})"
+              | sed -E "s/IDENTIFIED BY( PASSWORD)? '\\S+'/IDENTIFIED BY '[REDACTED]'/g" >> "$OUT_FILE" || echo "(no grants or user does not exist for ${USER_SPEC})" >> "$OUT_FILE"
           done
+
+      - name: Upload audit artifact (after)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-audit-after
+          path: ci-audit-after.txt
 
       - name: Cleanup CI DB user
         if: always()
