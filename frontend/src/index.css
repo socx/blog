@@ -36,6 +36,20 @@ html, body { height: 100%; }
     transition-duration: 260ms;
     transition-timing-function: cubic-bezier(.22,1,.36,1);
   }
+  
+    /* visual depth: subtle box-shadow on the toggle and knob */
+    .theme-toggle { box-shadow: 0 1px 0 rgba(2,6,23,0.04); }
+    .theme-toggle:hover { box-shadow: 0 6px 16px rgba(2,6,23,0.08); }
+    .theme-toggle:focus-visible { box-shadow: 0 8px 24px rgba(2,6,23,0.10); }
+  
+    .theme-toggle .knob { box-shadow: 0 1px 2px rgba(2,6,23,0.08); }
+    .theme-toggle:hover .knob { box-shadow: 0 6px 12px rgba(2,6,23,0.12); }
+  
+    /* press-scale: scale the inner knob for touch/active feedback without affecting translateX */
+    .theme-toggle .knob .knob-inner {
+      transition: transform 160ms cubic-bezier(.2,.9,.3,1), box-shadow 160ms cubic-bezier(.2,.9,.3,1);
+    }
+    .theme-toggle:active .knob .knob-inner { transform: scale(.94); }
 
   /* small nicety: make the SVG inside the knob fade/transform smoothly */
   .theme-toggle .knob svg {
