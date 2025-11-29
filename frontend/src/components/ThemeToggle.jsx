@@ -39,6 +39,7 @@ export default function ThemeToggle({ onChange }){
       aria-checked={dark}
       onClick={toggle}
       aria-label={dark ? 'Activate light mode' : 'Activate dark mode'}
+      data-dark={dark}
       className={`theme-toggle relative inline-flex items-center h-7 w-12 rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 ${dark ? 'bg-lime-500' : 'bg-slate-200'}`}
     >
       <span
