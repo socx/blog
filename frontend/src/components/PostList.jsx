@@ -37,10 +37,12 @@ export default function PostList(){
         <ul>
           {posts.map(p=> (
             <li key={p.id} className="border-b border-slate-200 py-4">
-              <a href={`/posts/${p.id}`} className="block">
-                <h3 className="text-lg font-medium">{p.title}</h3>
-              </a>
-              <p className="text-sm text-slate-600">{p.excerpt}</p>
+              <div className="prose prose-sm">
+                <a href={`/posts/${p.id}`} className="block">
+                  <h3 className="text-lg font-medium">{p.title}</h3>
+                </a>
+                <p className="text-sm text-slate-600">{p.excerpt}</p>
+              </div>
             </li>
           ))}
         </ul>

@@ -20,7 +20,7 @@ export default function FeaturedCarousel({ posts = [] }) {
             className="w-full md:w-1/3 h-56 object-cover"
           />
         ) : null}
-        <div className="p-4 md:p-6">
+        <div className="p-4 md:p-6 prose">
           <h3 className="text-lg font-semibold">{p.title}</h3>
           <p className="text-sm text-slate-600 mt-2">{p.excerpt || ''}</p>
           <a className="inline-block mt-3 text-sm text-indigo-600" href={`/posts/${p.id}`}>Read</a>
