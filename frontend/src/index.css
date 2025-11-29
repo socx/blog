@@ -3,18 +3,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Small helpers and project defaults */
-html,body{height:100%}
-body{@apply bg-white text-slate-900 antialiased}
-.container{max-width:var(--container); margin:0 auto}
-.site-header{@apply bg-slate-50 border-b border-slate-100}
-.site-footer{@apply border-t border-slate-100 mt-8 p-4 text-sm text-slate-600}
+/* Project defaults using Tailwind layers/components */
+html, body { height: 100%; }
 
-/* Carousel small helpers */
-.carousel-inner img{@apply w-full h-56 object-cover}
-.carousel-prev,.carousel-next{@apply absolute top-1/2 -translate-y-1/2 bg-black bg-opacity-40 text-white rounded-full w-9 h-9}
-.carousel-prev{left:8px}
-.carousel-next{right:8px}
+@layer base {
+	body { @apply bg-white text-slate-900 antialiased; }
+}
 
-.post-item{@apply border-b border-slate-200 py-4}
-.pagination{@apply flex items-center gap-2 mt-4}
+@layer components {
+	.container { @apply mx-auto px-4 max-w-[900px]; }
+	.site-header { @apply bg-slate-50 border-b border-slate-100; }
+	.site-footer { @apply border-t border-slate-100 mt-8 p-4 text-sm text-slate-600; }
+
+}

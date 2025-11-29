@@ -36,7 +36,7 @@ export default function PostList(){
       {loading ? <div>Loading posts...</div> : (
         <ul>
           {posts.map(p=> (
-            <li key={p.id} className="post-item">
+            <li key={p.id} className="border-b border-slate-200 py-4">
               <a href={`/posts/${p.id}`} className="block">
                 <h3 className="text-lg font-medium">{p.title}</h3>
               </a>
@@ -46,7 +46,7 @@ export default function PostList(){
         </ul>
       )}
 
-      <nav className="pagination">
+  <nav className="flex items-center gap-2 mt-4">
         <button className="px-3 py-1 bg-slate-100 rounded" onClick={()=>setPage(1)} disabled={page===1}>First</button>
         <button className="px-3 py-1 bg-slate-100 rounded" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>Prev</button>
         <span className="text-sm">Page {page} of {totalPages}</span>
