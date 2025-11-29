@@ -8,6 +8,8 @@
     "dev": "nodemon index.js",
     "test": "node ./bin/test-setup.js && (NODE_ENV=test jest --runInBand; EXIT_CODE=$?; node ./bin/test-teardown.js; exit $EXIT_CODE)",
     "lint": "eslint . --ext .js"
+    ,
+    "lint:fix": "eslint . --ext .js --fix"
   },
   "dependencies": {
     "express": "^4.18.2",
