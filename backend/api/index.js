@@ -27,7 +27,12 @@ function buildApp(knex) {
   const page = parseInt(req.query.page || '1', 10);
   const limit = Math.min(parseInt(req.query.limit || '12', 10), 100);
   const offset = (page - 1) * limit;
-    const posts = await knex('posts').select('id','title','slug','excerpt','published_at').where('status','published').orderBy('published_at','desc').limit(limit).offset(offset);
+    const q = knex('posts').select('id','title','slug','excerpt','published_at','featured').where('status','published');
+    // support ?featured=true to only return posts marked as featured
+    if (String(req.query.featured).toLowerCase() === 'true') {
+      q.andWhere('featured', true);
+    }
+    const posts = await q.orderBy('published_at','desc').limit(limit).offset(offset);
     res.json({ data: posts, meta: { page, limit } });
   });
 
@@ -93,11 +98,12 @@ function buildApp(knex) {
       body('status').optional().isIn(['draft', 'published', 'archived']).withMessage('invalid status'),
       body('published_at').optional({ nullable: true }).isISO8601().toDate(),
       body('featured_media_id').optional({ nullable: true }).isInt().toInt(),
+  body('featured').optional().isBoolean().toBoolean(),
     ],
     async (req, res) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-      const { title, slug, excerpt, content, status, published_at, featured_media_id } = req.body;
+  const { title, slug, excerpt, content, status, published_at, featured_media_id, featured } = req.body;
       const now = new Date();
       try {
         const [id] = await knex('posts').insert({
@@ -107,6 +113,7 @@ function buildApp(knex) {
           excerpt: excerpt || null,
           content: content || null,
           featured_media_id: featured_media_id || null,
+          featured: typeof featured !== 'undefined' ? !!featured : false,
           status: status || 'draft',
           published_at: published_at ? new Date(published_at) : null,
           created_at: now,
@@ -156,6 +163,7 @@ function buildApp(knex) {
       body('status').optional().isIn(['draft', 'published', 'archived']).withMessage('invalid status'),
       body('published_at').optional({ nullable: true }).isISO8601().toDate(),
       body('featured_media_id').optional({ nullable: true }).isInt().toInt(),
+      body('featured').optional().isBoolean().toBoolean(),
     ];
     // run validations
     for (const v of validations) {
@@ -163,7 +171,7 @@ function buildApp(knex) {
     }
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-    const allowed = ['title', 'slug', 'excerpt', 'content', 'status', 'published_at', 'featured_media_id'];
+  const allowed = ['title', 'slug', 'excerpt', 'content', 'status', 'published_at', 'featured_media_id', 'featured'];
     const updates = {};
     for (const k of allowed) if (Object.prototype.hasOwnProperty.call(req.body, k)) updates[k] = req.body[k];
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No updatable fields provided' });
