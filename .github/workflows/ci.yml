@@ -56,6 +56,103 @@ jobs:
           echo "MySQL did not become ready" >&2
           exit 1
 
+      - name: Create CI DB user and grants (repo-root-test)
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME: ${{ secrets.DB_NAME_TEST }}
+        run: |
+          echo "Creating CI DB user and granting minimal privileges"
+          SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, REFERENCES ON \`${DB_NAME}\`.* TO %s;"
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e "SELECT SUBSTRING_INDEX(USER(),'@',-1);" ) || true
+          if [ -z "$CLIENT_HOST" ]; then
+            CLIENT_HOST=127.0.0.1
+          fi
+          HOSTS=("$CLIENT_HOST" '127.0.0.1' '::1' 'localhost' '%')
+          for HOST in "${HOSTS[@]}"; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} IDENTIFIED BY '${DB_PASS}';"
+            GRANT_SQL=$(printf "$SQL_BASE" "${USER_SPEC}")
+            FULL_SQL="$CREATE_SQL $GRANT_SQL FLUSH PRIVILEGES;"
+            echo "$FULL_SQL"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "$FULL_SQL"
+            echo "Setting mysql_native_password for ${USER_SPEC}"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "ALTER USER ${USER_SPEC} IDENTIFIED WITH mysql_native_password BY '${DB_PASS}'; FLUSH PRIVILEGES;" || echo "Warning: failed to set plugin for ${USER_SPEC}"
+            echo "SHOW GRANTS FOR ${USER_SPEC};"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e "SHOW GRANTS FOR ${USER_SPEC};" || true
+          done
+
+      - name: Create CI DB user and grant tightened privileges
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_NAME: ${{ secrets.DB_NAME_TEST }}
+        run: |
+          echo "Creating CI DB user and granting privileges..."
+          SQL_BASE="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, "
+          SQL_BASE+="ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, "
+          SQL_BASE+="REFERENCES ON \`${DB_NAME}\`.* TO %s;"
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e \
+            "SELECT SUBSTRING_INDEX(USER(),'@',-1);" ) || true
+          if [ -z "$CLIENT_HOST" ]; then
+            CLIENT_HOST=127.0.0.1
+          fi
+          echo "Detected client host: $CLIENT_HOST"
+          HOSTS=("$CLIENT_HOST" '127.0.0.1' '::1' 'localhost' '%')
+          for HOST in "${HOSTS[@]}"; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} "
+            CREATE_SQL+="IDENTIFIED BY '${DB_PASS}';"
+            GRANT_SQL=$(printf "$SQL_BASE" "${USER_SPEC}")
+            FULL_SQL="$CREATE_SQL $GRANT_SQL FLUSH PRIVILEGES;"
+            echo "$FULL_SQL"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e "$FULL_SQL"
+            GRANTS=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e \
+              "SHOW GRANTS FOR ${USER_SPEC};")
+            echo "Grants for ${USER_SPEC}: $GRANTS"
+            echo "$GRANTS" | grep -qi 'DROP' && { echo "ERROR: DROP present"; exit 1; }
+            echo "$GRANTS" | grep -qi 'CREATE' || { echo "ERROR: CREATE missing"; exit 1; }
+            echo "$GRANTS" | grep -qi 'ALTER' || { echo "ERROR: ALTER missing"; exit 1; }
+            echo "Setting mysql_native_password for ${USER_SPEC}"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e \
+              "ALTER USER ${USER_SPEC} IDENTIFIED WITH mysql_native_password BY '${DB_PASS}'; FLUSH PRIVILEGES;" || \
+              echo "Warning: failed to set auth plugin for ${USER_SPEC}"
+          done
+
+      - name: Debug print sanitized grants for CI DB user
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+        run: |
+          echo "DEBUG: sanitized SHOW GRANTS for ${DB_USER}"
+          SED_PART1="s/IDENTIFIED BY( PASSWORD)? '\\S+"
+          SED_PART2="'/IDENTIFIED BY '[REDACTED]'/g"
+          SED_EXPR="$SED_PART1$SED_PART2"
+          CLIENT_HOST=$(mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e \
+            "SELECT SUBSTRING_INDEX(USER(),'@',-1);" ) || true
+          if [ -z "$CLIENT_HOST" ]; then
+            CLIENT_HOST=127.0.0.1
+          fi
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost' '%'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            echo "---- ${USER_SPEC} ----"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e \
+              "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
+              | sed -E "$SED_EXPR" || echo "(no grants for ${USER_SPEC})"
+          done
+
+      - name: "Debug mysql.user plugin info (sanitized)"
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        run: |
+          echo "DEBUG: mysql.user plugin column (user | host | plugin)"
+          mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e \
+            "SELECT user, host, plugin FROM mysql.user;" 2>/dev/null \
+            | awk -F"\t" '{printf "%s | %s | %s\n", $1, $2, $3}' || \
+            echo "(failed to read mysql.user)"
+
       - name: Install DB dependencies
         run: |
           # Try a clean install if a package-lock.json exists;
