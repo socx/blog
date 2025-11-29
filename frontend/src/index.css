@@ -8,11 +8,48 @@ html, body { height: 100%; }
 
 @layer base {
 	body { @apply bg-white text-slate-900 antialiased; }
+
+  /* dark-mode base styles (class strategy) */
+  .dark body { @apply bg-slate-900 text-slate-100; }
 }
 
 @layer components {
 	.container { @apply mx-auto px-4 max-w-[900px]; }
 	.site-header { @apply bg-slate-50 border-b border-slate-100; }
 	.site-footer { @apply border-t border-slate-100 mt-8 p-4 text-sm text-slate-600; }
+
+  /* demo dark-mode component overrides */
+  .dark .site-header { @apply bg-slate-800 border-slate-700; }
+  .dark .site-footer { @apply border-slate-700 text-slate-400; }
+
+  /* Theme toggle rendering hints and refined transitions */
+  .theme-toggle {
+    will-change: background-color, transform, opacity;
+    transition-property: background-color, border-color, box-shadow;
+    transition-duration: 280ms;
+    transition-timing-function: cubic-bezier(.2,.8,.2,1);
+  }
+
+  .theme-toggle .knob {
+    will-change: transform;
+    transition-property: transform, box-shadow;
+    transition-duration: 260ms;
+    transition-timing-function: cubic-bezier(.22,1,.36,1);
+  }
+
+  /* small nicety: make the SVG inside the knob fade/transform smoothly */
+  .theme-toggle .knob svg {
+    transition: opacity 200ms ease, transform 200ms ease;
+  }
+
+  /* Respect reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .theme-toggle,
+    .theme-toggle .knob,
+    .theme-toggle .knob svg {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 
 }

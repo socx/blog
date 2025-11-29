@@ -18,3 +18,9 @@ export async function fetchPosts({page, limit, featured} = {}){
   const url = `${API_BASE}/api/v1/posts?${params.toString()}`
   return fetchJson(url)
 }
+
+export async function getPost(id){
+  if(!id) throw new Error('missing id')
+  const url = `${API_BASE}/api/v1/posts/${encodeURIComponent(id)}`
+  return fetchJson(url)
+}
