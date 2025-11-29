@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ThemeToggle accessibility & snapshot > matches DOM snapshot 1`] = `
+<button
+  aria-checked="false"
+  aria-label="Activate dark mode"
+  class="theme-toggle relative inline-flex items-center h-7 w-12 rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 bg-slate-200"
+  data-dark="false"
+  role="switch"
+>
+  <span
+    aria-hidden="true"
+    class="knob inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-300 ease-out translate-x-1"
+  >
+    <span
+      class="knob-inner block h-full w-full rounded-full flex items-center justify-center"
+    >
+      <svg
+        class="h-5 w-5 text-yellow-400 dark:text-yellow-300"
+        fill="none"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M12 4.75V3m0 18v-1.75M4.75 12H3m18 0h-1.75M5.64 5.64L4.22 4.22m15.56 15.56l-1.41-1.41M18.36 5.64l1.41-1.41M4.22 19.78l1.41-1.41M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z"
+          fill="currentColor"
+        />
+      </svg>
+    </span>
+  </span>
+  <span
+    class="sr-only"
+  >
+    Toggle dark mode
+  </span>
+</button>
+`;
