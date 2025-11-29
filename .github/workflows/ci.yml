@@ -28,6 +28,9 @@ jobs:
           --health-retries=10
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Common setup (checkout, node, cache, install)
         uses: ./.github/actions/common-setup
         with:
@@ -128,7 +131,11 @@ jobs:
               CLIENT_HOST=127.0.0.1
             fi
             echo "Detected client host: $CLIENT_HOST"
-            for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
+            # Include a permissive host '%' so CI matrix runners and
+            # containers (example: 172.18.0.1) can connect. We still
+            # create host-specific accounts too for auditing.
+            HOSTS=("$CLIENT_HOST" '127.0.0.1' '::1' 'localhost' '%')
+            for HOST in "${HOSTS[@]}"; do
               USER_SPEC="'${DB_USER}'@'${HOST}'"
               CREATE_SQL="CREATE USER IF NOT EXISTS ${USER_SPEC} "
               CREATE_SQL+="IDENTIFIED BY '${DB_PASS}';"
@@ -217,14 +224,21 @@ jobs:
         env:
           ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           DB_USER: ${{ secrets.DB_USER }}
-          CLIENT_HOST: ${{ steps.detect-host.outputs.client_host }}
         run: |
           OUT_FILE=ci-audit-after.txt
           echo "Auditing grants AFTER for ${DB_USER} (sanitized)" > "$OUT_FILE"
           SED_PART1="s/IDENTIFIED BY( PASSWORD)? '\\S+"
           SED_PART2="'/IDENTIFIED BY '[REDACTED]'/g"
           SED_EXPR="$SED_PART1$SED_PART2"
-          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost'; do
+          # Detect client host inline (same method used for creation/cleanup)
+          CLIENT_HOST=$(
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e \
+              "SELECT SUBSTRING_INDEX(USER(),'@',-1);"
+          ) || true
+          if [ -z "$CLIENT_HOST" ]; then
+            CLIENT_HOST=127.0.0.1
+          fi
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost' '%'; do
             USER_SPEC="'${DB_USER}'@'${HOST}'"
             echo "--- ${USER_SPEC} ---" >> "$OUT_FILE"
             MYSQL_CMD=(mysql -h 127.0.0.1 -P 3306 -uroot \
@@ -235,6 +249,30 @@ jobs:
               MSG="(no grants or user does not exist for ${USER_SPEC})"
               echo "$MSG" >> "$OUT_FILE"
             fi
+          done
+
+      - name: Debug print sanitized grants for CI DB user
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_USER: ${{ secrets.DB_USER }}
+        run: |
+          echo "DEBUG: sanitized SHOW GRANTS for ${DB_USER}"
+          SED_PART1="s/IDENTIFIED BY( PASSWORD)? '\\S+"
+          SED_PART2="'/IDENTIFIED BY '[REDACTED]'/g"
+          SED_EXPR="$SED_PART1$SED_PART2"
+          CLIENT_HOST=$(
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -sN -e \
+              "SELECT SUBSTRING_INDEX(USER(),'@',-1);"
+          ) || true
+          if [ -z "$CLIENT_HOST" ]; then
+            CLIENT_HOST=127.0.0.1
+          fi
+          for HOST in "$CLIENT_HOST" '127.0.0.1' '::1' 'localhost' '%'; do
+            USER_SPEC="'${DB_USER}'@'${HOST}'"
+            echo "---- ${USER_SPEC} ----"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e \
+              "SHOW GRANTS FOR ${USER_SPEC};" 2>/dev/null \
+              | sed -E "$SED_EXPR" || echo "(no grants for ${USER_SPEC})"
           done
 
       - name: Upload audit artifact (after)
@@ -382,6 +420,9 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Common setup (checkout, node, cache, install)
         uses: ./.github/actions/common-setup
         with:
