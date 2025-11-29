@@ -163,6 +163,13 @@ jobs:
                 exit 1
               }
             done
+            # Ensure the CI user can authenticate with the common mysql
+            # client driver used in CI by setting the auth plugin for '%'.
+            # This addresses mismatches where the server uses caching_sha2_password
+            # but clients expect mysql_native_password.
+            echo "Setting mysql_native_password for '${DB_USER}'@'%'"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e \
+              "ALTER USER '${DB_USER}'@'%' IDENTIFIED WITH mysql_native_password BY '${DB_PASS}'; FLUSH PRIVILEGES;"
 
       - name: Cache npm and node_modules
         uses: actions/cache@v4
