@@ -36,6 +36,44 @@ html, body { height: 100%; }
     transition-duration: 260ms;
     transition-timing-function: cubic-bezier(.22,1,.36,1);
   }
+  
+    /* visual depth: subtle box-shadow on the toggle and knob */
+    .theme-toggle { box-shadow: 0 1px 0 rgba(2,6,23,0.04); }
+    .theme-toggle:hover { box-shadow: 0 6px 16px rgba(2,6,23,0.08); }
+    .theme-toggle:focus-visible { box-shadow: 0 8px 24px rgba(2,6,23,0.10); }
+  
+    .theme-toggle .knob { box-shadow: 0 1px 2px rgba(2,6,23,0.08); }
+    .theme-toggle:hover .knob { box-shadow: 0 6px 12px rgba(2,6,23,0.12); }
+  
+    /* press-scale: scale the inner knob for touch/active feedback without affecting translateX */
+    .theme-toggle .knob .knob-inner {
+      transition: transform 160ms cubic-bezier(.2,.9,.3,1), box-shadow 160ms cubic-bezier(.2,.9,.3,1);
+    }
+    .theme-toggle:active .knob .knob-inner { transform: scale(.94); }
+
+    /* subtle background gradients and hover/focus glow variations per state */
+    .theme-toggle { background-repeat: no-repeat; background-position: center; }
+    /* dark state gradient */
+    .theme-toggle[data-dark="true"] {
+      background-image: linear-gradient(135deg, rgba(134,239,172,0.08), rgba(16,24,40,0.02));
+    }
+    /* light state gradient */
+    .theme-toggle[data-dark="false"] {
+      background-image: linear-gradient(135deg, rgba(2,6,23,0.025), rgba(99,102,241,0.02));
+    }
+
+    /* knob glow variations on hover and focus (different tint for dark vs light) */
+    .theme-toggle[data-dark="true"]:hover .knob .knob-inner,
+    .theme-toggle[data-dark="true"]:focus-visible .knob .knob-inner {
+      box-shadow: 0 8px 28px rgba(16,185,129,0.16);
+    }
+    .theme-toggle[data-dark="false"]:hover .knob .knob-inner,
+    .theme-toggle[data-dark="false"]:focus-visible .knob .knob-inner {
+      box-shadow: 0 8px 28px rgba(2,6,23,0.06);
+    }
+
+    /* stronger focus ring for keyboard users while keeping reduced-motion in mind */
+    .theme-toggle:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(99,102,241,0.12); }
 
   /* small nicety: make the SVG inside the knob fade/transform smoothly */
   .theme-toggle .knob svg {
