@@ -22,4 +22,8 @@ html, body { height: 100%; }
   .dark .site-header { @apply bg-slate-800 border-slate-700; }
   .dark .site-footer { @apply border-slate-700 text-slate-400; }
 
+  /* Theme toggle rendering hints and refined transitions */
+  .theme-toggle { will-change: background-color, transform, opacity; }
+  .theme-toggle .knob { transition-timing-function: cubic-bezier(.2,.8,.2,1); }
+
 }
