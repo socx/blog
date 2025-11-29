@@ -288,6 +288,18 @@ jobs:
               | sed -E "$SED_EXPR" || echo "(no grants for ${USER_SPEC})"
           done
 
+      - name: Debug mysql.user plugin info (sanitized)
+        env:
+          ROOT_PASS: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        run: |
+          echo "DEBUG: mysql.user plugin column (user | host | plugin)"
+          # Query the mysql.user table for user/host/plugin and print a
+          # sanitized, column-separated output for debugging.
+          mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -s -N -e \
+            "SELECT user, host, plugin FROM mysql.user;" 2>/dev/null \
+            | awk -F"\t" '{printf "%s | %s | %s\n", $1, $2, $3}' || \
+            echo "(failed to read mysql.user)"
+
       - name: Upload audit artifact (after)
         uses: actions/upload-artifact@v4
         with:
