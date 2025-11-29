@@ -387,8 +387,8 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-        - name: Run fast unit tests
-          working-directory: ./backend/api
-          # Run only the unit tests under test/unit
-          # to avoid starting DB setup/teardown
-          run: npx jest --testPathPattern "test/unit" --runInBand
+      - name: Run fast unit tests
+        working-directory: ./backend/api
+        # Run only the unit tests under test/unit
+        # to avoid starting DB setup/teardown
+        run: npx jest --testPathPattern "test/unit" --runInBand
