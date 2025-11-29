@@ -1,3 +1,5 @@
+const plugin = require('tailwindcss/plugin');
+
 module.exports = {
   darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
@@ -22,15 +24,9 @@ module.exports = {
               borderRadius: theme('borderRadius.sm'),
             },
             'blockquote p': { color: theme('colors.slate.600') },
-            // responsive heading size tweaks using explicit media queries for better minifier support
-            [ `@media (min-width: ${theme('screens.md')})` ]: {
-              h1: { fontSize: theme('fontSize.4xl')[0] },
-              h2: { fontSize: theme('fontSize.3xl')[0] },
-            },
-            [ `@media (min-width: ${theme('screens.lg')})` ]: {
-              h1: { fontSize: theme('fontSize.5xl')[0] },
-              h2: { fontSize: theme('fontSize.4xl')[0] },
-            },
+            // NOTE: responsive heading sizes are emitted via a small plugin below as
+            // top-level @media rules so they don't end up nested inside the
+            // `.prose` rule (which triggered CSS minifier/nesting warnings).
           },
         },
         sm: {
@@ -64,5 +60,18 @@ module.exports = {
   },
   plugins: [
     require('@tailwindcss/typography'),
+    // small plugin to emit top-level media rules for responsive prose headings
+    plugin(function ({ addBase, theme }) {
+      addBase({
+        [ `@media (min-width: ${theme('screens.md')})` ]: {
+          '.prose h1': { fontSize: theme('fontSize.4xl')[0] },
+          '.prose h2': { fontSize: theme('fontSize.3xl')[0] },
+        },
+        [ `@media (min-width: ${theme('screens.lg')})` ]: {
+          '.prose h1': { fontSize: theme('fontSize.5xl')[0] },
+          '.prose h2': { fontSize: theme('fontSize.4xl')[0] },
+        },
+      });
+    }),
   ],
-}
+};
