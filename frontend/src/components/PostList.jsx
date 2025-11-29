@@ -37,21 +37,21 @@ export default function PostList(){
         <ul>
           {posts.map(p=> (
             <li key={p.id} className="post-item">
-              <a href={`/posts/${p.id}`}>
-                <h3>{p.title}</h3>
+              <a href={`/posts/${p.id}`} className="block">
+                <h3 className="text-lg font-medium">{p.title}</h3>
               </a>
-              <p className="excerpt">{p.excerpt}</p>
+              <p className="text-sm text-slate-600">{p.excerpt}</p>
             </li>
           ))}
         </ul>
       )}
 
       <nav className="pagination">
-        <button onClick={()=>setPage(1)} disabled={page===1}>First</button>
-        <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>Prev</button>
-        <span>Page {page} of {totalPages}</span>
-        <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}>Next</button>
-        <button onClick={()=>setPage(totalPages)} disabled={page===totalPages}>Last</button>
+        <button className="px-3 py-1 bg-slate-100 rounded" onClick={()=>setPage(1)} disabled={page===1}>First</button>
+        <button className="px-3 py-1 bg-slate-100 rounded" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>Prev</button>
+        <span className="text-sm">Page {page} of {totalPages}</span>
+        <button className="px-3 py-1 bg-slate-100 rounded" onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}>Next</button>
+        <button className="px-3 py-1 bg-slate-100 rounded" onClick={()=>setPage(totalPages)} disabled={page===totalPages}>Last</button>
       </nav>
     </div>
   )

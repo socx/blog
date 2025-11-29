@@ -24,14 +24,14 @@ export default function Home(){
   },[])
 
   return (
-    <div className="home-page">
+    <div className="home-page space-y-8">
       <section className="featured-section">
-        <h2>Featured</h2>
+        <h2 className="text-xl font-semibold mb-3">Featured</h2>
         {loadingFeatured ? <div>Loading featured...</div> : <FeaturedCarousel posts={featured} />}
       </section>
 
       <section className="list-section">
-        <h2>Recent posts</h2>
+        <h2 className="text-xl font-semibold mb-3">Recent posts</h2>
         <PostList />
       </section>
     </div>

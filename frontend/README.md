@@ -17,3 +17,9 @@ Quick start:
    VITE_API_BASE=http://localhost:3000 npm run dev
 
 This app contains a `Home` page that fetches featured posts and renders a simple featured carousel and a paginated list of recent posts.
+ 
+Tailwind
+ 
+This project uses Tailwind CSS. The styles are compiled automatically by Vite using PostCSS. No additional steps are required beyond installing dependencies.
+
+If you edit `src/index.css`, keep the `@tailwind` directives at the top so Tailwind utilities are generated.
