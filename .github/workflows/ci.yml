@@ -162,6 +162,12 @@ jobs:
                 echo "ERROR: ALTER privilege missing for ${USER_SPEC}"
                 exit 1
               }
+              # Also ensure this specific host account uses mysql_native_password
+              # so the Node mysql2 client can authenticate from container IPs.
+              echo "Setting mysql_native_password for ${USER_SPEC}"
+              mysql -h 127.0.0.1 -P 3306 -uroot -p"$ROOT_PASS" -e \
+                "ALTER USER ${USER_SPEC} IDENTIFIED WITH mysql_native_password BY '${DB_PASS}'; FLUSH PRIVILEGES;" || \
+                echo "Warning: failed to set auth plugin for ${USER_SPEC}"
             done
             # Ensure the CI user can authenticate with the common mysql
             # client driver used in CI by setting the auth plugin for '%'.
