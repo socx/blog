@@ -1,0 +1,22 @@
+:root{
+  --container: 900px;
+}
+*{box-sizing:border-box}
+body{font-family:system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin:0; color:#111}
+.container{max-width:var(--container); margin:0 auto; padding:1rem}
+.site-header{background:#f8fafc; border-bottom:1px solid #e6eef6}
+.site-header h1{margin:0; padding:1rem 0}
+.featured-section{margin:1.5rem 0}
+.carousel{position:relative; border:1px solid #e2e8f0; padding:0.5rem; overflow:hidden}
+.carousel-image{max-width:100%; height:220px; object-fit:cover; display:block}
+.carousel-body{padding:0.5rem}
+.carousel-prev, .carousel-next{position:absolute; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.4); color:white; border:none; width:36px; height:36px; border-radius:18px}
+.carousel-prev{left:8px}
+.carousel-next{right:8px}
+.post-list ul{list-style:none; padding:0}
+.post-item{border-bottom:1px solid #eee; padding:0.75rem 0}
+.post-item h3{margin:0}
+.pagination{display:flex; gap:0.5rem; align-items:center; margin-top:1rem}
+.read-more{display:inline-block; margin-top:0.5rem}
+
+.site-footer{border-top:1px solid #e6eef6; padding:1rem; margin-top:2rem}
