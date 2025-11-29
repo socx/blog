@@ -23,7 +23,33 @@ html, body { height: 100%; }
   .dark .site-footer { @apply border-slate-700 text-slate-400; }
 
   /* Theme toggle rendering hints and refined transitions */
-  .theme-toggle { will-change: background-color, transform, opacity; }
-  .theme-toggle .knob { transition-timing-function: cubic-bezier(.2,.8,.2,1); }
+  .theme-toggle {
+    will-change: background-color, transform, opacity;
+    transition-property: background-color, border-color, box-shadow;
+    transition-duration: 280ms;
+    transition-timing-function: cubic-bezier(.2,.8,.2,1);
+  }
+
+  .theme-toggle .knob {
+    will-change: transform;
+    transition-property: transform, box-shadow;
+    transition-duration: 260ms;
+    transition-timing-function: cubic-bezier(.22,1,.36,1);
+  }
+
+  /* small nicety: make the SVG inside the knob fade/transform smoothly */
+  .theme-toggle .knob svg {
+    transition: opacity 200ms ease, transform 200ms ease;
+  }
+
+  /* Respect reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .theme-toggle,
+    .theme-toggle .knob,
+    .theme-toggle .knob svg {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 
 }
