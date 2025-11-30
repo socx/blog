@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-ro
 import Login from './components/Login.jsx';
 import PostList from './components/PostList.jsx';
 import PostEditor from './components/PostEditor.jsx';
+import CreatePost from './components/CreatePost.jsx';
 import { getStoredToken, logout } from './api/auth.js';
 
 function RequireAuth({ children }){
@@ -27,6 +28,7 @@ export default function App(){
           <nav className="flex gap-3 text-sm">
             {token && <>
               <Link to="/posts">Posts</Link>
+              <Link to="/posts/new">New Post</Link>
             </>}
           </nav>
           <div className="ml-auto">
@@ -38,6 +40,7 @@ export default function App(){
             <Route path="/login" element={<Login onAuth={()=> setToken(getStoredToken())} />} />
             <Route path="/" element={<RequireAuth><PostList /></RequireAuth>} />
             <Route path="/posts" element={<RequireAuth><PostList /></RequireAuth>} />
+            <Route path="/posts/new" element={<RequireAuth><CreatePost /></RequireAuth>} />
             <Route path="/posts/:id" element={<RequireAuth><PostEditor /></RequireAuth>} />
           </Routes>
         </main>

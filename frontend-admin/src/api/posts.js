@@ -29,6 +29,15 @@ export async function updatePost(id, data){
   return json(res);
 }
 
+export async function createPost(data){
+  const res = await fetch(`${API_BASE}/api/v1/admin/posts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data)
+  });
+  return json(res);
+}
+
 export async function setPostCategories(id, categoryIds){
   const res = await fetch(`${API_BASE}/api/v1/admin/posts/${id}/categories`, {
     method: 'POST',
