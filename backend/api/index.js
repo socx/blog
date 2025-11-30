@@ -1,4 +1,48 @@
-require('dotenv').config();
+// Load env from both repo root and backend/api to avoid cwd issues
+const path = require('path');
+const fs = require('fs');
+const rootEnvPath = path.resolve(__dirname, '..', '..', '.env');
+const apiEnvPath = path.join(__dirname, '.env');
+const loadedEnvPaths = [];
+if (fs.existsSync(rootEnvPath)) {
+  require('dotenv').config({ path: rootEnvPath });
+  loadedEnvPaths.push(rootEnvPath);
+}
+if (fs.existsSync(apiEnvPath)) {
+  require('dotenv').config({ path: apiEnvPath });
+  loadedEnvPaths.push(apiEnvPath);
+}
+// Diagnostic log: which .env files were loaded and which expected keys are present
+try {
+  const expectedKeys = ['JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASS', 'DB_NAME', 'DB_PORT', 'NODE_ENV'];
+  const present = expectedKeys.filter((k) => process.env[k] && String(process.env[k]).trim() !== '');
+  const missing = expectedKeys.filter((k) => !present.includes(k));
+  console.log('[env] loaded paths:', loadedEnvPaths);
+  console.log('[env] present keys:', present);
+  if (missing.length) console.log('[env] missing keys:', missing);
+} catch (_) {
+  // ignore logging errors
+}
+
+// Fail-fast environment validation
+function requireEnvVars(vars) {
+  console.log({processEnv: process.env.NODE_ENV});
+  const missing = vars.filter((k) => !process.env[k] || String(process.env[k]).trim() === '');
+  if (missing.length) {
+    const msg = `Missing required environment variables: ${missing.join(', ')}\n` +
+      'Create a .env file (see repo root .env.example) or export them in your shell.\n' +
+      'Example minimal setup:\n' +
+      '  JWT_SECRET=change-me\n' +
+      '  DB_HOST=127.0.0.1\n  DB_PORT=3306\n  DB_USER=faithstories\n  DB_PASS=faithpass\n  DB_NAME=faithstories_dev\n';
+    console.error(msg);
+    process.exit(1);
+  }
+}
+
+// Required for boot; skip strict check in NODE_ENV=test (tests manage env separately)
+if ((process.env.NODE_ENV || 'development') !== 'test') {
+  requireEnvVars(['JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASS', 'DB_NAME']);
+}
 const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -6,6 +50,8 @@ const cors = require('cors');
 const knexConfig = require('../db/knexfile');
 const Knex = require('knex');
 const { body, validationResult } = require('express-validator');
+
+
 
 const env = process.env.NODE_ENV || 'development';
 // fall back to development config if the environment key isn't present
@@ -23,16 +69,51 @@ function buildApp(knex) {
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // Public endpoints (stub)
+  // Public taxonomy lists (no auth)
+  app.get('/api/v1/categories', async (req, res) => {
+    const rows = await knex('categories').select('id','name','slug').orderBy('name');
+    res.json({ data: rows });
+  });
+  app.get('/api/v1/tags', async (req, res) => {
+    const rows = await knex('tags').select('id','name','slug').orderBy('name');
+    res.json({ data: rows });
+  });
   app.get('/api/v1/posts', async (req, res) => {
-  const page = parseInt(req.query.page || '1', 10);
-  const limit = Math.min(parseInt(req.query.limit || '12', 10), 100);
-  const offset = (page - 1) * limit;
-    const q = knex('posts').select('id','title','slug','excerpt','published_at','featured').where('status','published');
-    // support ?featured=true to only return posts marked as featured
+    const page = parseInt(req.query.page || '1', 10);
+    const limit = Math.min(parseInt(req.query.limit || '12', 10), 100);
+    const offset = (page - 1) * limit;
+    const { category, tag } = req.query; // slug values
+    const q = knex('posts').where('status','published');
+    // Maintain legacy column names for unit tests when no filters applied
+    let aliasing = false;
     if (String(req.query.featured).toLowerCase() === 'true') {
       q.andWhere('featured', true);
     }
-    const posts = await q.orderBy('published_at','desc').limit(limit).offset(offset);
+    if (category) {
+      aliasing = true;
+      q.join('post_categories','post_categories.post_id','posts.id')
+        .join('categories','categories.id','post_categories.category_id')
+        .andWhere('categories.slug', String(category));
+    }
+    if (tag) {
+      aliasing = true;
+      q.join('post_tags','post_tags.post_id','posts.id')
+        .join('tags','tags.id','post_tags.tag_id')
+        .andWhere('tags.slug', String(tag));
+    }
+    if (aliasing) {
+      q.select(
+        'posts.id as id',
+        'posts.title as title',
+        'posts.slug as slug',
+        'posts.excerpt as excerpt',
+        'posts.published_at as published_at',
+        'posts.featured as featured'
+      ).orderBy('posts.published_at','desc');
+    } else {
+      q.select('id','title','slug','excerpt','published_at','featured').orderBy('published_at','desc');
+    }
+    const posts = await q.limit(limit).offset(offset);
     res.json({ data: posts, meta: { page, limit } });
   });
 
@@ -210,6 +291,129 @@ function buildApp(knex) {
 
   // mount admin router with auth
   app.use('/api/v1/admin', authenticateJWT, requireAdmin, adminRouter);
+
+  // --- Taxonomy Routers (admin) ---
+  const taxonomyRouter = express.Router();
+
+  // Categories CRUD
+  taxonomyRouter.get('/categories', async (req, res) => {
+    const rows = await knex('categories').select('*').orderBy('name');
+    res.json({ data: rows });
+  });
+  taxonomyRouter.post('/categories', [
+    body('name').isString().trim().isLength({ min: 2 }),
+    body('slug').isString().trim().matches(/^[a-z0-9-]+$/)
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const { name, slug } = req.body;
+    try {
+      const [id] = await knex('categories').insert({ name, slug });
+      const row = await knex('categories').where({ id }).first();
+      res.status(201).json({ data: row });
+    } catch (err) {
+      if (err && err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'slug already exists' });
+      console.error(err); return res.status(500).json({ error: 'Failed to create category' });
+    }
+  });
+  taxonomyRouter.put('/categories/:id', async (req, res) => {
+    const { id } = req.params;
+    const updates = {};
+    if (req.body.name) updates.name = req.body.name;
+    if (req.body.slug) updates.slug = req.body.slug;
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'No updatable fields provided' });
+    try {
+      const count = await knex('categories').where({ id }).update(updates);
+      if (!count) return res.status(404).json({ error: 'Not found' });
+      const row = await knex('categories').where({ id }).first();
+      res.json({ data: row });
+    } catch (err) {
+      if (err && err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'slug already exists' });
+      console.error(err); return res.status(500).json({ error: 'Failed to update category' });
+    }
+  });
+  taxonomyRouter.delete('/categories/:id', async (req, res) => {
+    const { id } = req.params;
+    const count = await knex('categories').where({ id }).del();
+    if (!count) return res.status(404).json({ error: 'Not found' });
+    res.status(204).send();
+  });
+
+  // Tags CRUD
+  taxonomyRouter.get('/tags', async (req, res) => {
+    const rows = await knex('tags').select('*').orderBy('name');
+    res.json({ data: rows });
+  });
+  taxonomyRouter.post('/tags', [
+    body('name').isString().trim().isLength({ min: 2 }),
+    body('slug').isString().trim().matches(/^[a-z0-9-]+$/)
+  ], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const { name, slug } = req.body;
+    try {
+      const [id] = await knex('tags').insert({ name, slug });
+      const row = await knex('tags').where({ id }).first();
+      res.status(201).json({ data: row });
+    } catch (err) {
+      if (err && err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'slug already exists' });
+      console.error(err); return res.status(500).json({ error: 'Failed to create tag' });
+    }
+  });
+  taxonomyRouter.put('/tags/:id', async (req, res) => {
+    const { id } = req.params;
+    const updates = {};
+    if (req.body.name) updates.name = req.body.name;
+    if (req.body.slug) updates.slug = req.body.slug;
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'No updatable fields provided' });
+    try {
+      const count = await knex('tags').where({ id }).update(updates);
+      if (!count) return res.status(404).json({ error: 'Not found' });
+      const row = await knex('tags').where({ id }).first();
+      res.json({ data: row });
+    } catch (err) {
+      if (err && err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'slug already exists' });
+      console.error(err); return res.status(500).json({ error: 'Failed to update tag' });
+    }
+  });
+  taxonomyRouter.delete('/tags/:id', async (req, res) => {
+    const { id } = req.params;
+    const count = await knex('tags').where({ id }).del();
+    if (!count) return res.status(404).json({ error: 'Not found' });
+    res.status(204).send();
+  });
+
+  // Attach categories/tags to post (replace sets)
+  taxonomyRouter.post('/posts/:id/categories', async (req, res) => {
+    const { id } = req.params;
+    const list = Array.isArray(req.body.categories) ? req.body.categories : [];
+    const exists = await knex('posts').where({ id }).first();
+    if (!exists) return res.status(404).json({ error: 'Post not found' });
+    await knex.transaction(async (trx) => {
+      await trx('post_categories').where({ post_id: id }).del();
+      for (const catId of list) {
+        await trx('post_categories').insert({ post_id: id, category_id: catId });
+      }
+    });
+    const rows = await knex('post_categories').join('categories','categories.id','post_categories.category_id').select('categories.id','categories.name','categories.slug').where('post_categories.post_id', id);
+    res.json({ data: rows });
+  });
+  taxonomyRouter.post('/posts/:id/tags', async (req, res) => {
+    const { id } = req.params;
+    const list = Array.isArray(req.body.tags) ? req.body.tags : [];
+    const exists = await knex('posts').where({ id }).first();
+    if (!exists) return res.status(404).json({ error: 'Post not found' });
+    await knex.transaction(async (trx) => {
+      await trx('post_tags').where({ post_id: id }).del();
+      for (const tagId of list) {
+        await trx('post_tags').insert({ post_id: id, tag_id: tagId });
+      }
+    });
+    const rows = await knex('post_tags').join('tags','tags.id','post_tags.tag_id').select('tags.id','tags.name','tags.slug').where('post_tags.post_id', id);
+    res.json({ data: rows });
+  });
+
+  app.use('/api/v1/admin', authenticateJWT, requireAdmin, taxonomyRouter);
 
   return app;
 }

@@ -2,6 +2,37 @@
 
 High-level specification and user stories drafted in `specification.md` and `user_stories.md`.
 
+## Local Development – One-Command Start
+
+The root `package.json` provides a `start` script that launches all three services concurrently:
+
+- `frontend` (Vite dev server, default `http://localhost:5173`)
+- `frontend-admin` (Vite dev server, `http://localhost:5183`)
+- `backend/api` (Express API, `http://localhost:4000`)
+
+### Prerequisites
+
+1. Copy `.env.example` to `.env` in the repo root and adjust values as needed:
+
+```bash
+cp .env.example .env
+```
+
+The API reads env via `dotenv`, and both frontends read `VITE_*` vars.
+
+### Start Everything
+
+```bash
+npm install
+npm run start
+```
+
+If you need to customize API base for the frontends, update `VITE_API_BASE` and `VITE_API_BASE_ADMIN` in `.env`.
+
+### Notes
+- Ports can be changed in each app’s `package.json` (admin currently uses `5183`).
+- To stop, press `Ctrl+C` in the terminal. If you had a previous API instance, ensure port `4000` is free (`lsof -i :4000`).
+
 ## Local dev: migrations, seeds and running the API
 
 The repository was reorganized: the server code lives under `backend/api` and DB migrations/seeds under `backend/db`.
