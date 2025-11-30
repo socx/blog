@@ -1,4 +1,23 @@
 require('dotenv').config();
+
+// Fail-fast environment validation
+function requireEnvVars(vars) {
+  const missing = vars.filter((k) => !process.env[k] || String(process.env[k]).trim() === '');
+  if (missing.length) {
+    const msg = `Missing required environment variables: ${missing.join(', ')}\n` +
+      'Create a .env file (see repo root .env.example) or export them in your shell.\n' +
+      'Example minimal setup:\n' +
+      '  JWT_SECRET=change-me\n' +
+      '  DB_HOST=127.0.0.1\n  DB_PORT=3306\n  DB_USER=faithstories\n  DB_PASS=faithpass\n  DB_NAME=faithstories_dev\n';
+    console.error(msg);
+    process.exit(1);
+  }
+}
+
+// Required for boot; skip strict check in NODE_ENV=test (tests manage env separately)
+if ((process.env.NODE_ENV || 'development') !== 'test') {
+  requireEnvVars(['JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASS', 'DB_NAME']);
+}
 const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
