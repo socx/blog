@@ -7,6 +7,13 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
+// In CI the MySQL service is ephemeral; dropping the DB is unnecessary and
+// can hang if connections linger without DROP privilege. Skip for CI.
+if (process.env.CI === 'true') {
+  console.log('CI detected: skipping test database drop');
+  process.exit(0);
+}
+
 async function dropTestDatabase() {
   const host = process.env.DB_HOST || '127.0.0.1';
   const port = parseInt(process.env.DB_PORT || '3306', 10);
