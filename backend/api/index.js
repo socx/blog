@@ -1,7 +1,32 @@
-require('dotenv').config();
+// Load env from both repo root and backend/api to avoid cwd issues
+const path = require('path');
+const fs = require('fs');
+const rootEnvPath = path.resolve(__dirname, '..', '..', '.env');
+const apiEnvPath = path.join(__dirname, '.env');
+const loadedEnvPaths = [];
+if (fs.existsSync(rootEnvPath)) {
+  require('dotenv').config({ path: rootEnvPath });
+  loadedEnvPaths.push(rootEnvPath);
+}
+if (fs.existsSync(apiEnvPath)) {
+  require('dotenv').config({ path: apiEnvPath });
+  loadedEnvPaths.push(apiEnvPath);
+}
+// Diagnostic log: which .env files were loaded and which expected keys are present
+try {
+  const expectedKeys = ['JWT_SECRET', 'DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASS', 'DB_NAME', 'DB_PORT', 'NODE_ENV'];
+  const present = expectedKeys.filter((k) => process.env[k] && String(process.env[k]).trim() !== '');
+  const missing = expectedKeys.filter((k) => !present.includes(k));
+  console.log('[env] loaded paths:', loadedEnvPaths);
+  console.log('[env] present keys:', present);
+  if (missing.length) console.log('[env] missing keys:', missing);
+} catch (_) {
+  // ignore logging errors
+}
 
 // Fail-fast environment validation
 function requireEnvVars(vars) {
+  console.log({processEnv: process.env.NODE_ENV});
   const missing = vars.filter((k) => !process.env[k] || String(process.env[k]).trim() === '');
   if (missing.length) {
     const msg = `Missing required environment variables: ${missing.join(', ')}\n` +
@@ -25,6 +50,8 @@ const cors = require('cors');
 const knexConfig = require('../db/knexfile');
 const Knex = require('knex');
 const { body, validationResult } = require('express-validator');
+
+
 
 const env = process.env.NODE_ENV || 'development';
 // fall back to development config if the environment key isn't present
