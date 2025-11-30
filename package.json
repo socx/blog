@@ -12,7 +12,8 @@
     "seed": "npx knex seed:run --knexfile knexfile.js",
     "dev:docker": "docker compose -f docker-compose.dev.yml up --build",
     "dev:docker:down": "docker compose -f docker-compose.dev.yml down --volumes --remove-orphans",
-    "dev:docker:logs": "docker compose -f docker-compose.dev.yml logs --follow"
+    "dev:docker:logs": "docker compose -f docker-compose.dev.yml logs --follow",
+    "start": "concurrently -n frontend,admin,api -c green,magenta,cyan \"npm --prefix frontend run dev\" \"npm --prefix frontend-admin run dev\" \"npm --prefix backend/api run dev\""
   },
   "dependencies": {
     "knex": "^2.5.1",
@@ -21,6 +22,7 @@
     "dotenv": "^16.3.1"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^2.0.22",
+    "concurrently": "^9.0.0"
   }
 }
