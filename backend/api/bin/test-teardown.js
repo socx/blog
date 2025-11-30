@@ -49,7 +49,11 @@ async function dropTestDatabase() {
     console.warn(`Warning: failed to drop test database '${dbName}': ${err && err.message ? err.message : err}`);
     process.exitCode = 1;
   } finally {
-    try { await conn.end(); } catch (_) {}
+    try {
+      await conn.end();
+    } catch (_) {
+      console.warn('Warning: failed to close DB connection during teardown.');
+    }
   }
 }
 
