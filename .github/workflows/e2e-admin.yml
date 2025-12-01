@@ -25,6 +25,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/api/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-backend-node-${{ hashFiles('backend/api/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-backend-node-
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -33,6 +43,16 @@ jobs:
       - name: Install backend deps
         working-directory: ./backend/api
         run: npm ci
+
+      - name: Cache frontend-admin node_modules and npm cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend-admin/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-admin-node-${{ hashFiles('frontend-admin/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-admin-node-
 
       - name: Prepare test DB (migrations + seeds)
         working-directory: ./backend/api
@@ -63,6 +83,16 @@ jobs:
       - name: Install admin deps
         working-directory: ./frontend-admin
         run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/playwright
+          key: ${{ runner.os }}-playwright-browsers-${{ hashFiles('frontend-admin/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-browsers-
 
       - name: Install Playwright browsers
         working-directory: ./frontend-admin
