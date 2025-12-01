@@ -13,32 +13,64 @@ export default function Post(){
     let mounted = true
     setLoading(true)
     getPost(id)
-      .then(p=>{
+      .then(raw => {
         if(!mounted) return
+        const p = raw && raw.data ? raw.data : raw
         if(!p) {
           setError('Not found')
           return
         }
         setPost(p)
-        // basic SEO meta updates
+        // basic SEO meta updates (title, description, canonical, og tags)
         try{
-          document.title = `${p.title} — My Blog`
-          const desc = p.excerpt || (p.body ? p.body.slice(0,160) : '')
-          let meta = document.querySelector('meta[name="description"]')
-          if(!meta){
-            meta = document.createElement('meta')
-            meta.name = 'description'
-            document.head.appendChild(meta)
+          const siteBase = import.meta.env.VITE_SITE_BASE || window.location.origin
+          const siteName = import.meta.env.VITE_SITE_NAME || 'My Blog'
+          const prevTitle = document.title
+          document.title = `${p.title} — ${siteName}`
+
+          // description
+          const desc = p.excerpt || (p.body ? String(p.body).slice(0,160) : '')
+          let metaDesc = document.querySelector('meta[name="description"]')
+          const prevDesc = metaDesc ? metaDesc.content : null
+          if(!metaDesc){
+            metaDesc = document.createElement('meta')
+            metaDesc.name = 'description'
+            document.head.appendChild(metaDesc)
           }
-          meta.content = desc
-          // og tags
-          const setTag = (prop, content)=>{
+          metaDesc.content = desc || ''
+
+          // canonical
+          let linkCanon = document.querySelector('link[rel="canonical"]')
+          const canonHref = `${siteBase.replace(/\/$/, '')}/posts/${encodeURIComponent(p.slug || p.id)}`
+          const prevCanon = linkCanon ? linkCanon.href : null
+          if(!linkCanon){
+            linkCanon = document.createElement('link')
+            linkCanon.rel = 'canonical'
+            document.head.appendChild(linkCanon)
+          }
+          linkCanon.href = canonHref
+
+          // Open Graph
+          const setOG = (prop, content) => {
             let el = document.querySelector(`meta[property="${prop}"]`)
             if(!el){ el = document.createElement('meta'); el.setAttribute('property', prop); document.head.appendChild(el) }
             el.content = content || ''
           }
-          setTag('og:title', p.title)
-          setTag('og:description', desc)
+          setOG('og:title', p.title)
+          setOG('og:description', desc)
+          setOG('og:url', canonHref)
+          if(p.featured_media_url) setOG('og:image', p.featured_media_url)
+
+          // cleanup on unmount: restore title/description/canonical if we created them
+          const cleanup = () => {
+            try{
+              document.title = prevTitle
+              if (metaDesc && prevDesc !== null) metaDesc.content = prevDesc
+              if (linkCanon && prevCanon !== null) linkCanon.href = prevCanon
+            }catch(e){}
+          }
+          // attach cleanup to element so we can call later
+          document._postCleanup = cleanup
         }catch(e){/* ignore */}
       })
       .catch(err=>{
