@@ -6,7 +6,9 @@
     "dev": "vite --port 5183",
     "build": "vite build",
     "preview": "vite preview --port 5183",
-    "test": "vitest --environment jsdom --run"
+    "test": "vitest --environment jsdom --run",
+    "test:e2e": "playwright test --config=playwright.config.js",
+    "playwright:install": "npx playwright install --with-deps"
   },
   "dependencies": {
     "react": "18.2.0",
@@ -20,5 +22,9 @@
     "@testing-library/react": "^14.0.0",
     "@testing-library/jest-dom": "^6.0.0",
     "jsdom": "^27.0.1"
+  }
+  ,
+  "dependencies": {
+    "@playwright/test": "^1.40.0"
   }
 }
