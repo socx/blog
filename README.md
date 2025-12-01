@@ -1,5 +1,7 @@
 # FaithStories — blog repo
 
+![Admin E2E](https://github.com/socx/blog/actions/workflows/e2e-admin.yml/badge.svg)
+
 High-level specification and user stories drafted in `specification.md` and `user_stories.md`.
 
 ## Local Development – One-Command Start
