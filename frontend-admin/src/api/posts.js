@@ -1,5 +1,5 @@
 import { authHeaders } from './auth.js';
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 
 async function json(res){
   if(!res.ok){
@@ -25,6 +25,22 @@ export async function updatePost(id, data){
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(data)
+  });
+  return json(res);
+}
+
+export async function publishPost(id){
+  const res = await fetch(`${API_BASE}/api/v1/admin/posts/${id}/publish`, {
+    method: 'POST',
+    headers: { ...authHeaders() }
+  });
+  return json(res);
+}
+
+export async function unpublishPost(id){
+  const res = await fetch(`${API_BASE}/api/v1/admin/posts/${id}/unpublish`, {
+    method: 'POST',
+    headers: { ...authHeaders() }
   });
   return json(res);
 }

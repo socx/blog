@@ -276,6 +276,44 @@ function buildApp(knex) {
     }
   });
 
+  // Publish a post: sets status='published' and published_at=now
+  adminRouter.post('/posts/:id/publish', async (req, res) => {
+    const { id } = req.params;
+    const now = new Date();
+    try {
+      const count = await knex('posts').where({ id }).update({
+        status: 'published',
+        published_at: now,
+        updated_at: now,
+      });
+      if (!count) return res.status(404).json({ error: 'Not found' });
+      const post = await knex('posts').where({ id }).first();
+      res.json({ data: post });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to publish post' });
+    }
+  });
+
+  // Unpublish a post: sets status='draft' and clears published_at
+  adminRouter.post('/posts/:id/unpublish', async (req, res) => {
+    const { id } = req.params;
+    const now = new Date();
+    try {
+      const count = await knex('posts').where({ id }).update({
+        status: 'draft',
+        published_at: null,
+        updated_at: now,
+      });
+      if (!count) return res.status(404).json({ error: 'Not found' });
+      const post = await knex('posts').where({ id }).first();
+      res.json({ data: post });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to unpublish post' });
+    }
+  });
+
   // Delete post
   adminRouter.delete('/posts/:id', async (req, res) => {
     const { id } = req.params;
