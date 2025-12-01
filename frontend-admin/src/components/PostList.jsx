@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { listPosts } from '../api/posts.js';
+import { listPosts, publishPost, unpublishPost } from '../api/posts.js';
 import { Link } from 'react-router-dom';
 
 export default function PostList(){
@@ -31,7 +31,7 @@ export default function PostList(){
             <th className="p-2 text-left">Title</th>
             <th className="p-2 text-left">Status</th>
             <th className="p-2 text-left">Featured</th>
-            <th className="p-2" /></tr>
+            <th className="p-2">Actions</th></tr>
         </thead>
         <tbody>
           {posts.map(p=> (
@@ -39,7 +39,24 @@ export default function PostList(){
               <td className="p-2">{p.title}</td>
               <td className="p-2">{p.status}</td>
               <td className="p-2">{p.featured ? 'Yes' : 'No'}</td>
-              <td className="p-2"><Link className="text-indigo-600" to={`/posts/${p.id}`}>Edit</Link></td>
+              <td className="p-2 flex items-center gap-2">
+                <Link className="text-indigo-600" to={`/posts/${p.id}`}>Edit</Link>
+                {p.status === 'published' ? (
+                  <button onClick={async ()=>{
+                    try {
+                      await unpublishPost(p.id);
+                      setPosts(prev => prev.map(x => x.id===p.id ? {...x, status: 'draft', published_at: null} : x));
+                    } catch (err) { setError(err.message || String(err)); }
+                  }} className="text-sm px-2 py-0.5 bg-amber-600 text-white rounded">Unpublish</button>
+                ) : (
+                  <button onClick={async ()=>{
+                    try {
+                      await publishPost(p.id);
+                      setPosts(prev => prev.map(x => x.id===p.id ? {...x, status: 'published', published_at: new Date().toISOString()} : x));
+                    } catch (err) { setError(err.message || String(err)); }
+                  }} className="text-sm px-2 py-0.5 bg-emerald-600 text-white rounded">Publish</button>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

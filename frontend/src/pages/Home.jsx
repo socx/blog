@@ -10,10 +10,10 @@ export default function Home(){
   useEffect(()=>{
     let mounted = true
     setLoadingFeatured(true)
-    fetchPosts({featured: true, limit: 6})
+    import('../api/posts').then(mod => mod.fetchFeatured(6))
       .then(r=>{
         if(!mounted) return
-        setFeatured(r.rows || r || [])
+        setFeatured((r && r.data) || [])
       })
       .catch(err=>{
         console.error('Failed to load featured posts', err)

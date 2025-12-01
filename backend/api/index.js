@@ -124,6 +124,18 @@ function buildApp(knex) {
     res.json({ data: post });
   });
 
+  // Featured posts endpoint (public): returns top N featured published posts
+  app.get('/api/v1/featured', async (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit || '6', 10), 50);
+    const rows = await knex('posts')
+      .where({ status: 'published' })
+      .andWhere('featured', true)
+      .select('id','title','slug','excerpt','published_at','featured')
+      .orderBy('published_at', 'desc')
+      .limit(limit);
+    res.json({ data: rows, meta: { limit } });
+  });
+
 // Auth stub for admin (login)
   app.post('/api/v1/auth/login', async (req, res) => {
     const { email, password } = req.body;

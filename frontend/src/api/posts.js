@@ -16,7 +16,23 @@ export async function fetchPosts({page, limit, featured} = {}){
   if(typeof featured !== 'undefined') params.set('featured', String(featured))
 
   const url = `${API_BASE}/api/v1/posts?${params.toString()}`
-  return fetchJson(url)
+  const res = await fetchJson(url)
+  // Normalize response shapes for callers: always return { rows, count }
+  if (!res) return { rows: [], count: 0 }
+  if (Array.isArray(res)) return { rows: res, count: res.length }
+  if (res.data) {
+    const rows = Array.isArray(res.data) ? res.data : []
+    const count = res.meta && (res.meta.count || res.meta.total) ? (res.meta.count || res.meta.total) : rows.length
+    return { rows, count }
+  }
+  return { rows: [], count: 0 }
+}
+
+export async function fetchFeatured(limit = 6){
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  const url = `${API_BASE}/api/v1/featured?${params.toString()}`;
+  return fetchJson(url);
 }
 
 export async function getPost(id){
