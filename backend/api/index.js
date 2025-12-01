@@ -83,7 +83,11 @@ function buildApp(knex) {
     const limit = Math.min(parseInt(req.query.limit || '12', 10), 100);
     const offset = (page - 1) * limit;
     const { category, tag } = req.query; // slug values
-    const q = knex('posts').where('status','published');
+    const q = knex('posts').where('status','published')
+      .andWhere(function() {
+        // only include posts with no published_at (legacy) or published_at <= now()
+        this.whereNull('published_at').orWhere('published_at', '<=', knex.fn.now())
+      });
     // Maintain legacy column names for unit tests when no filters applied
     let aliasing = false;
     if (String(req.query.featured).toLowerCase() === 'true') {
@@ -122,9 +126,31 @@ function buildApp(knex) {
 
   app.get('/api/v1/posts/:slug', async (req, res) => {
     const { slug } = req.params;
-    const post = await knex('posts').where({ slug, status: 'published' }).first();
-    if (!post) return res.status(404).json({ error: 'Not found' });
-    res.json({ data: post });
+    // only return published posts whose published_at is not in the future
+    const post = await knex('posts')
+      .where({ slug, status: 'published' })
+      .andWhere(function(){ this.whereNull('published_at').orWhere('published_at', '<=', knex.fn.now()) })
+      .first();
+    if (post) return res.json({ data: post });
+
+    // Not found -- check if this slug maps to a previous slug
+    try {
+      const map = await knex('post_slugs').where({ slug }).first();
+      if (map && map.post_id) {
+        const newPost = await knex('posts').where({ id: map.post_id, status: 'published' }).first();
+        if (newPost) {
+          // respond with 301 and Location header to canonical post URL
+          const siteBase = (process.env.SITE_BASE_URL || process.env.VITE_API_BASE || 'http://localhost:4000').replace(/\/$/, '');
+          const loc = `${siteBase}/posts/${encodeURIComponent(newPost.slug)}`;
+          res.set('Location', loc);
+          return res.status(301).json({ redirect: loc });
+        }
+      }
+    } catch (err) {
+      console.warn('post slug redirect lookup failed:', err && err.message ? err.message : err);
+    }
+
+    return res.status(404).json({ error: 'Not found' });
   });
 
   // Featured posts endpoint (public): returns top N featured published posts
@@ -274,6 +300,8 @@ function buildApp(knex) {
   adminRouter.put('/posts/:id', async (req, res) => {
     const { id } = req.params;
     await Promise.resolve();
+    // fetch current post to detect slug changes
+    const currentPost = await knex('posts').where({ id }).first();
     const validations = [
       body('title').optional().isString().trim().isLength({ min: 3 }).withMessage('title must be at least 3 characters'),
       body('slug')
@@ -308,6 +336,14 @@ function buildApp(knex) {
       }
     }
     try {
+      // If slug changed, record the old slug for redirects
+      if (updates.slug && currentPost && currentPost.slug && updates.slug !== currentPost.slug) {
+        try {
+          await knex('post_slugs').insert({ slug: currentPost.slug, post_id: id });
+        } catch (e) {
+          // ignore duplicate or permission errors
+        }
+      }
       const count = await knex('posts').where({ id }).update(updates);
       if (!count) return res.status(404).json({ error: 'Not found' });
       const post = await knex('posts').where({ id }).first();
