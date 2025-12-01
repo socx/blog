@@ -13,10 +13,25 @@ export default function PostEditor(){
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [publishing, setPublishing] = useState(false);
+  const [publishedAtInput, setPublishedAtInput] = useState('')
 
   useEffect(()=>{
     let mounted = true;
     getPost(id).then(r=>{ if(mounted) setPost(r.data); }).catch(e=> setError(e.message));
+    // initialize published_at input when post loads
+    getPost(id).then(r => {
+      const p = r && r.data ? r.data : r
+      if (!p) return
+      if (p.published_at) {
+        // convert to local datetime-local value
+        const d = new Date(p.published_at)
+        const tzOffsetMin = d.getTimezoneOffset()
+        d.setMinutes(d.getMinutes() - tzOffsetMin)
+        setPublishedAtInput(d.toISOString().slice(0,16))
+      } else {
+        setPublishedAtInput('')
+      }
+    }).catch(()=>{})
     listCategories().then(r=>{ if(mounted) setCategories(r.data); });
     listTags().then(r=>{ if(mounted) setTags(r.data); });
     return ()=> mounted = false;
@@ -26,7 +41,15 @@ export default function PostEditor(){
     e.preventDefault();
     setSaving(true); setError(null); setMessage(null);
     try {
-      const updated = await updatePost(id, { title: post.title, excerpt: post.excerpt, featured: !!post.featured });
+      const payload = { title: post.title, excerpt: post.excerpt, featured: !!post.featured };
+      if (publishedAtInput) {
+        // convert local input back to ISO
+        const d = new Date(publishedAtInput)
+        payload.published_at = d.toISOString()
+      } else if (post.published_at === null) {
+        payload.published_at = null
+      }
+      const updated = await updatePost(id, payload);
       setPost(updated.data);
       setMessage('Saved');
     } catch(err){ setError(err.message); } finally { setSaving(false); }
@@ -68,9 +91,14 @@ export default function PostEditor(){
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Edit Post: {post.title}</h2>
         <div className="flex items-center gap-3">
-          <span className={`text-xs px-2 py-0.5 rounded border ${post.status==='published' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
-            {post.status || 'draft'}{post.published_at ? ` • ${new Date(post.published_at).toLocaleString()}` : ''}
-          </span>
+          {(() => {
+            const isScheduled = post && post.published_at && new Date(post.published_at) > new Date();
+            return (
+              <span className={`text-xs px-2 py-0.5 rounded border ${isScheduled ? 'bg-blue-50 text-blue-700 border-blue-200' : (post.status==='published' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200')}`}>
+                {isScheduled ? `Scheduled • ${new Date(post.published_at).toLocaleString()}` : `${post.status || 'draft'}${post.published_at && new Date(post.published_at) <= new Date() ? ` • ${new Date(post.published_at).toLocaleString()}` : ''}`}
+              </span>
+            )
+          })()}
           {post.status === 'published' ? (
             <button onClick={doUnpublish} disabled={publishing} className="bg-amber-600 text-white px-3 py-1 rounded disabled:opacity-50">
               {publishing ? 'Working...' : 'Unpublish'}
@@ -92,6 +120,11 @@ export default function PostEditor(){
         <div>
           <label className="block text-sm font-medium">Excerpt</label>
           <textarea className="border px-2 py-1 w-full" rows={3} value={post.excerpt || ''} onChange={e=> setPost({...post, excerpt: e.target.value})} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Publish Date (optional)</label>
+          <input type="datetime-local" className="border px-2 py-1 w-full" value={publishedAtInput} onChange={e=> setPublishedAtInput(e.target.value)} />
+          <p className="text-xs text-slate-500 mt-1">Set a future date to schedule publishing.</p>
         </div>
         <div className="flex items-center gap-2">
           <input id="featured" type="checkbox" checked={!!post.featured} onChange={e=> setPost({...post, featured: e.target.checked})} />

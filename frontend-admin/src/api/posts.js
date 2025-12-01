@@ -9,8 +9,10 @@ async function json(res){
   return res.json();
 }
 
-export async function listPosts(page=1, limit=20){
+export async function listPosts(opts = {}){
+  const { page = 1, limit = 20, scheduled } = opts;
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (typeof scheduled !== 'undefined') params.set('scheduled', scheduled ? 'true' : 'false');
   const res = await fetch(`${API_BASE}/api/v1/admin/posts?${params}`, { headers: { ...authHeaders() } });
   return json(res);
 }
