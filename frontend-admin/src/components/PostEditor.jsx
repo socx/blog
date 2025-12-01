@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getPost, updatePost, listCategories, listTags, setPostCategories, setPostTags } from '../api/posts.js';
+import { getPost, updatePost, listCategories, listTags, setPostCategories, setPostTags, publishPost, unpublishPost } from '../api/posts.js';
 
 export default function PostEditor(){
   const { id } = useParams();
@@ -12,6 +12,7 @@ export default function PostEditor(){
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(()=>{
     let mounted = true;
@@ -41,12 +42,46 @@ export default function PostEditor(){
     } catch(err){ setError(err.message); } finally { setSaving(false); }
   }
 
+  async function doPublish(){
+    setPublishing(true); setError(null); setMessage(null);
+    try {
+      const r = await publishPost(id);
+      setPost(r.data);
+      setMessage('Published');
+    } catch(err){ setError(err.message); } finally { setPublishing(false); }
+  }
+
+  async function doUnpublish(){
+    setPublishing(true); setError(null); setMessage(null);
+    try {
+      const r = await unpublishPost(id);
+      setPost(r.data);
+      setMessage('Unpublished');
+    } catch(err){ setError(err.message); } finally { setPublishing(false); }
+  }
+
   if(error) return <div className="text-red-600">{error}</div>;
   if(!post) return <div>Loading post...</div>;
 
   return (
     <div className="space-y-8 max-w-3xl">
-      <h2 className="text-lg font-semibold">Edit Post: {post.title}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Edit Post: {post.title}</h2>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs px-2 py-0.5 rounded border ${post.status==='published' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+            {post.status || 'draft'}{post.published_at ? ` • ${new Date(post.published_at).toLocaleString()}` : ''}
+          </span>
+          {post.status === 'published' ? (
+            <button onClick={doUnpublish} disabled={publishing} className="bg-amber-600 text-white px-3 py-1 rounded disabled:opacity-50">
+              {publishing ? 'Working...' : 'Unpublish'}
+            </button>
+          ) : (
+            <button onClick={doPublish} disabled={publishing} className="bg-emerald-600 text-white px-3 py-1 rounded disabled:opacity-50">
+              {publishing ? 'Working...' : 'Publish'}
+            </button>
+          )}
+        </div>
+      </div>
       {message && <div className="text-green-600 text-sm">{message}</div>}
 
       <form onSubmit={saveBasic} className="space-y-4 border p-4 rounded bg-white">
