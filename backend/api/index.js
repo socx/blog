@@ -124,6 +124,46 @@ function buildApp(knex) {
     res.json({ data: post });
   });
 
+  // Featured posts endpoint (public): returns top N featured published posts
+  app.get('/api/v1/featured', async (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit || '6', 10), 50);
+    const rows = await knex('posts')
+      .where({ status: 'published' })
+      .andWhere('featured', true)
+      .select('id','title','slug','excerpt','published_at','featured')
+      .orderBy('published_at', 'desc')
+      .limit(limit);
+    res.json({ data: rows, meta: { limit } });
+  });
+
+  // Sitemap XML for published posts
+  app.get('/sitemap.xml', async (req, res) => {
+    try {
+      const siteBase = (process.env.SITE_BASE_URL || process.env.VITE_API_BASE || 'http://localhost:4000').replace(/\/$/, '');
+      const rows = await knex('posts')
+        .where({ status: 'published' })
+        .select('slug', 'published_at', 'updated_at')
+        .orderBy('published_at', 'desc')
+        .limit(50000);
+
+      const urlset = rows.map(r => {
+        const loc = `${siteBase}/posts/${encodeURIComponent(r.slug)}`;
+        const last = (r.published_at || r.updated_at) ? new Date(r.published_at || r.updated_at).toISOString() : null;
+        return `  <url>\n    <loc>${loc}</loc>${last ? `\n    <lastmod>${last}</lastmod>` : ''}\n  </url>`;
+      }).join('\n');
+
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+        `${urlset}\n</urlset>`;
+
+      res.header('Content-Type', 'application/xml');
+      return res.send(xml);
+    } catch (err) {
+      console.error('Failed to generate sitemap:', err && err.message ? err.message : err);
+      return res.status(500).send('Failed to generate sitemap');
+    }
+  });
+
 // Auth stub for admin (login)
   app.post('/api/v1/auth/login', async (req, res) => {
     const { email, password } = req.body;

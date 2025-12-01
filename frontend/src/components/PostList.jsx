@@ -8,11 +8,16 @@ export default function PostList(){
   const [posts, setPosts] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  // Accept optional filters via props
+  // Usage: <PostList category="slug" tag="slug" />
+  // React will pass props as the first argument
+  const props = arguments[0] || {};
+  const { category, tag } = props;
 
   useEffect(()=>{
     let mounted = true
     setLoading(true)
-    fetchPosts({page, limit})
+    fetchPosts({page, limit, category, tag})
       .then(r=>{
         if(!mounted) return
         // API shape: {rows, count} or array - handle both
