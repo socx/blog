@@ -91,9 +91,14 @@ export default function PostEditor(){
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Edit Post: {post.title}</h2>
         <div className="flex items-center gap-3">
-          <span className={`text-xs px-2 py-0.5 rounded border ${post.status==='published' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
-            {post.status || 'draft'}{post.published_at ? ` • ${new Date(post.published_at).toLocaleString()}` : ''}
-          </span>
+          {(() => {
+            const isScheduled = post && post.published_at && new Date(post.published_at) > new Date();
+            return (
+              <span className={`text-xs px-2 py-0.5 rounded border ${isScheduled ? 'bg-blue-50 text-blue-700 border-blue-200' : (post.status==='published' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200')}`}>
+                {isScheduled ? `Scheduled • ${new Date(post.published_at).toLocaleString()}` : `${post.status || 'draft'}${post.published_at && new Date(post.published_at) <= new Date() ? ` • ${new Date(post.published_at).toLocaleString()}` : ''}`}
+              </span>
+            )
+          })()}
           {post.status === 'published' ? (
             <button onClick={doUnpublish} disabled={publishing} className="bg-amber-600 text-white px-3 py-1 rounded disabled:opacity-50">
               {publishing ? 'Working...' : 'Unpublish'}
