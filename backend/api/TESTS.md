@@ -47,3 +47,23 @@ curl -i -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer
 ```
 
 ... (commands omitted for brevity; same content as original) ...
+
+## Admin: scheduled posts filter
+
+The admin posts list supports a `scheduled` query parameter to return only posts that are scheduled to be published in the future.
+
+Example: list only scheduled (future `published_at`) posts
+
+```bash
+# assuming you stored a token in $TOKEN as above
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:4000/api/v1/admin/posts?scheduled=true" | jq .
+```
+
+Behavior:
+- `?scheduled=true` — returns posts whose `published_at` is in the future (scheduled posts).
+- No `scheduled` param (or `scheduled=false`) — returns the normal admin list (all posts regardless of publish time).
+
+Notes:
+- The filter is intended for the admin UI to show only items scheduled for future publishing.
+- The public `GET /api/v1/posts` endpoint already respects `published_at` and only returns currently-published posts (i.e. those with `published_at` <= now or null).
