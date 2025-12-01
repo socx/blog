@@ -342,7 +342,7 @@ function buildApp(knex) {
     // When scheduled=true, return posts that have a published_at in the future
     const scheduledFlag = String(req.query.scheduled || '').toLowerCase();
     if (scheduledFlag === 'true' || scheduledFlag === '1') {
-      q.where('published_at', '>', knex.fn.now());
+      q.where('published_at', '>', knex.raw('DATE_ADD(NOW(), INTERVAL 2 SECOND)'));
     }
 
     const rows = await q.orderBy('created_at', 'desc').limit(limit).offset(offset);
