@@ -108,10 +108,13 @@ function buildApp(knex) {
         'posts.slug as slug',
         'posts.excerpt as excerpt',
         'posts.published_at as published_at',
-        'posts.featured as featured'
+        'posts.featured as featured',
+        'posts.meta_title as meta_title',
+        'posts.meta_description as meta_description',
+        'posts.meta_image_url as meta_image_url'
       ).orderBy('posts.published_at','desc');
     } else {
-      q.select('id','title','slug','excerpt','published_at','featured').orderBy('published_at','desc');
+      q.select('id','title','slug','excerpt','published_at','featured','meta_title','meta_description','meta_image_url').orderBy('published_at','desc');
     }
     const posts = await q.limit(limit).offset(offset);
     res.json({ data: posts, meta: { page, limit } });
@@ -130,7 +133,7 @@ function buildApp(knex) {
     const rows = await knex('posts')
       .where({ status: 'published' })
       .andWhere('featured', true)
-      .select('id','title','slug','excerpt','published_at','featured')
+      .select('id','title','slug','excerpt','published_at','featured','meta_title','meta_description','meta_image_url')
       .orderBy('published_at', 'desc')
       .limit(limit);
     res.json({ data: rows, meta: { limit } });
