@@ -1,0 +1,116 @@
+name: Admin E2E (Playwright)
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # The Admin E2E workflow is currently disabled.
+  # Rename the disabled file back to the original path and push:
+  # git mv .github/workflows/e2e-admin.yml.disabled .github/workflows/e2e-admin.yml
+  # git commit -m "ci: re-enable admin E2E workflow"
+  # git push
+  e2e-admin:
+    name: Admin E2E
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache backend node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/api/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-backend-node-${{ hashFiles('backend/api/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-backend-node-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install backend deps
+        working-directory: ./backend/api
+        run: npm ci
+
+      - name: Cache frontend-admin node_modules and npm cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend-admin/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-admin-node-${{ hashFiles('frontend-admin/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-admin-node-
+
+      - name: Prepare test DB (migrations + seeds)
+        working-directory: ./backend/api
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASS: root
+          DB_NAME_TEST: faithstories_test
+          NODE_ENV: test
+        run: |
+          # wait for mysql to become available
+          npx wait-on tcp:3306 --timeout 120000
+          node ./bin/test-setup.js
+
+      - name: Start backend server
+        working-directory: ./backend/api
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASS: root
+          PORT: 4000
+        run: |
+          # start backend in background
+          nohup npm start > backend.log 2>&1 &
+
+      - name: Install admin deps
+        working-directory: ./frontend-admin
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/playwright
+          key: ${{ runner.os }}-playwright-browsers-${{ hashFiles('frontend-admin/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-browsers-
+
+      - name: Install Playwright browsers
+        working-directory: ./frontend-admin
+        run: npx playwright install --with-deps
+
+      - name: Start admin dev server
+        working-directory: ./frontend-admin
+        env:
+          VITE_API_BASE: http://localhost:4000
+        run: |
+          nohup env VITE_API_BASE=http://localhost:4000 npm run dev > admin.log 2>&1 &
+
+      - name: Wait for backend and admin servers
+        run: npx wait-on http://localhost:4000/api/health http://localhost:5183 --timeout 120000
+
+      - name: Run Playwright E2E
+        working-directory: ./frontend-admin
+        run: npm run test:e2e
