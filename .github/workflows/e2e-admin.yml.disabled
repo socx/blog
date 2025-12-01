@@ -5,6 +5,11 @@ on:
     branches: [ main ]
 
 jobs:
+  # The Admin E2E workflow is currently disabled.
+  # Rename the disabled file back to the original path and push:
+  # git mv .github/workflows/e2e-admin.yml.disabled .github/workflows/e2e-admin.yml
+  # git commit -m "ci: re-enable admin E2E workflow"
+  # git push
   e2e-admin:
     name: Admin E2E
     runs-on: ubuntu-latest
