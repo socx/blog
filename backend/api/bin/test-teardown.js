@@ -70,6 +70,11 @@ const safetyTimer = setTimeout(() => {
 function removeUploadsDirIfSafe() {
   try {
     const uploadsDir = process.env.UPLOADS_DIR;
+    const cleanupFlag = String(process.env.CLEANUP_UPLOADS || 'true').toLowerCase();
+    if (cleanupFlag === 'false') {
+      console.log('[teardown] CLEANUP_UPLOADS is false; skipping uploads dir removal');
+      return;
+    }
     if (!uploadsDir) return;
     const resolved = path.resolve(uploadsDir);
     const tmp = os.tmpdir();
@@ -93,12 +98,20 @@ function removeUploadsDirIfSafe() {
 if (require.main === module) {
   dropTestDatabase()
     .then(() => {
-      try { removeUploadsDirIfSafe(); } catch (e) {}
+      try {
+        removeUploadsDirIfSafe();
+      } catch (e) {
+
+      }
       clearTimeout(safetyTimer);
       process.exit(0);
     })
     .catch(() => {
-      try { removeUploadsDirIfSafe(); } catch (e) {}
+      try {
+        removeUploadsDirIfSafe();
+      } catch (e) {
+
+      }
       clearTimeout(safetyTimer);
       // Exit 0 to avoid failing CI due to privilege constraints
       process.exit(0);
@@ -107,7 +120,11 @@ if (require.main === module) {
 
 if (require.main === module) {
   dropTestDatabase().then(() => {
-    try { removeUploadsDirIfSafe(); } catch (e) {}
+    try {
+      removeUploadsDirIfSafe(); 
+    } catch (e) {
+      
+    }
     process.exit(process.exitCode || 0);
   });
 }

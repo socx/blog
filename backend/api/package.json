@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node ./bin/test-setup.js && (UPLOADS_DIR=$(node ./bin/mk-uploads-dir.js) NODE_ENV=test jest --runInBand --detectOpenHandles --forceExit; EXIT_CODE=$?; node ./bin/test-teardown.js; rm -rf \"$UPLOADS_DIR\"; exit $EXIT_CODE)",
+    "test": "sh -lc 'node ./bin/test-setup.js && if [ -z \"$UPLOADS_DIR\" ]; then export UPLOADS_DIR=$(node ./bin/mk-uploads-dir.js); MKDIR_CREATED=1; else MKDIR_CREATED=0; fi; NODE_ENV=test jest --runInBand --detectOpenHandles --forceExit; EXIT_CODE=$?; node ./bin/test-teardown.js; if [ \"$MKDIR_CREATED\" = \"1\" ] && [ \"${CLEANUP_UPLOADS:-true}\" != \"false\" ]; then rm -rf \"$UPLOADS_DIR\"; fi; exit $EXIT_CODE'",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix"
   },

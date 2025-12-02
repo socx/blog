@@ -69,10 +69,15 @@ function buildApp(knex) {
   try {
     // Allow configuring uploads directory via environment variable (useful for tests or alternate storage)
     const uploadsPath = process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR) : path.resolve(__dirname, '..', '..', 'uploads');
-    console.log('[uploads] serving from:', uploadsPath);
-    // Serve uploaded media files from the uploads directory.
-    // Rely on Helmet's Cross-Origin-Resource-Policy (configured above) rather than setting it manually here.
-    app.use('/uploads', express.static(uploadsPath));
+    // Allow disabling static serving via env var SERVE_UPLOADS (set to 'false' to disable)
+    if (String(process.env.SERVE_UPLOADS || 'true').toLowerCase() !== 'false') {
+      console.log('[uploads] serving from:', uploadsPath);
+      // Serve uploaded media files from the uploads directory.
+      // Rely on Helmet's Cross-Origin-Resource-Policy (configured above) rather than setting it manually here.
+      app.use('/uploads', express.static(uploadsPath));
+    } else {
+      console.log('[uploads] static serving disabled (SERVE_UPLOADS=false)');
+    }
   } catch (e) {
     console.warn('Failed to mount uploads static dir:', e && e.message ? e.message : e);
   }
