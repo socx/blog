@@ -6,6 +6,9 @@
 
 require('dotenv').config();
 const mysql = require('mysql2/promise');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 async function killActiveConnections(conn, dbName) {
   try {
@@ -64,13 +67,38 @@ const safetyTimer = setTimeout(() => {
   process.exit(0);
 }, timeoutMs);
 
+function removeUploadsDirIfSafe() {
+  try {
+    const uploadsDir = process.env.UPLOADS_DIR;
+    if (!uploadsDir) return;
+    const resolved = path.resolve(uploadsDir);
+    const tmp = os.tmpdir();
+    // Only remove if uploadsDir is inside system temp directory (safety guard)
+    if (resolved.indexOf(path.resolve(tmp)) !== 0) {
+      console.warn(`[teardown] skipping removal of UPLOADS_DIR outside tmp: ${resolved}`);
+      return;
+    }
+    console.log(`[teardown] removing UPLOADS_DIR: ${resolved}`);
+    try {
+      fs.rmSync(resolved, { recursive: true, force: true });
+    } catch (e) {
+      // older Node may not have fs.rmSync; fallback to rmdirSync
+      try { fs.rmdirSync(resolved, { recursive: true }); } catch (_) {}
+    }
+  } catch (err) {
+    console.warn('[teardown] failed to remove UPLOADS_DIR:', err && err.message ? err.message : err);
+  }
+}
+
 if (require.main === module) {
   dropTestDatabase()
     .then(() => {
+      try { removeUploadsDirIfSafe(); } catch (e) {}
       clearTimeout(safetyTimer);
       process.exit(0);
     })
     .catch(() => {
+      try { removeUploadsDirIfSafe(); } catch (e) {}
       clearTimeout(safetyTimer);
       // Exit 0 to avoid failing CI due to privilege constraints
       process.exit(0);
@@ -78,5 +106,8 @@ if (require.main === module) {
 }
 
 if (require.main === module) {
-  dropTestDatabase().then(() => process.exit(process.exitCode || 0));
+  dropTestDatabase().then(() => {
+    try { removeUploadsDirIfSafe(); } catch (e) {}
+    process.exit(process.exitCode || 0);
+  });
 }

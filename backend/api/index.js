@@ -67,7 +67,9 @@ function buildApp(knex) {
   app.use(cors());
   // serve uploaded media files
   try {
-    const uploadsPath = path.resolve(__dirname, '..', '..', 'uploads');
+    // Allow configuring uploads directory via environment variable (useful for tests or alternate storage)
+    const uploadsPath = process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR) : path.resolve(__dirname, '..', '..', 'uploads');
+    console.log('[uploads] serving from:', uploadsPath);
     // Serve uploaded media files from the uploads directory.
     // Rely on Helmet's Cross-Origin-Resource-Policy (configured above) rather than setting it manually here.
     app.use('/uploads', express.static(uploadsPath));
@@ -516,7 +518,7 @@ function buildApp(knex) {
   // mount admin router with auth
   // Add media upload route on admin router before mounting
   try {
-    const uploadsDir = path.resolve(__dirname, '..', '..', 'uploads');
+    const uploadsDir = process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR) : path.resolve(__dirname, '..', '..', 'uploads');
     const storage = multer.diskStorage({
       destination: (req, file, cb) => {
         try {
