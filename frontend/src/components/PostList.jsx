@@ -33,7 +33,7 @@ export default function PostList(){
       .finally(()=> mounted && setLoading(false))
 
     return ()=> mounted = false
-  },[page, limit])
+  },[page, limit, category, tag])
 
   const totalPages = Math.max(1, Math.ceil(total / limit))
 

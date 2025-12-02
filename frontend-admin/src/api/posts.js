@@ -83,3 +83,21 @@ export async function listTags(){
   const res = await fetch(`${API_BASE}/api/v1/tags`);
   return json(res);
 }
+
+export async function createCategory(data){
+  const res = await fetch(`${API_BASE}/api/v1/admin/categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data)
+  });
+  return json(res);
+}
+
+export async function createTag(data){
+  const res = await fetch(`${API_BASE}/api/v1/admin/tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data)
+  });
+  return json(res);
+}

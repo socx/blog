@@ -354,6 +354,16 @@ function buildApp(knex) {
     const { id } = req.params;
     const post = await knex('posts').where({ id }).first();
     if (!post) return res.status(404).json({ error: 'Not found' });
+    try {
+      const categoryRows = await knex('post_categories').where({ post_id: id }).select('category_id');
+      const tagRows = await knex('post_tags').where({ post_id: id }).select('tag_id');
+      post.category_ids = Array.isArray(categoryRows) ? categoryRows.map(r => r.category_id) : [];
+      post.tag_ids = Array.isArray(tagRows) ? tagRows.map(r => r.tag_id) : [];
+    } catch (e) {
+      // ignore taxonomy read errors for admin view
+      post.category_ids = [];
+      post.tag_ids = [];
+    }
     res.json({ data: post });
   });
 

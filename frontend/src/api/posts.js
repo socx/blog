@@ -9,11 +9,13 @@ async function fetchJson(url, opts){
   return res.json().catch(()=> null)
 }
 
-export async function fetchPosts({page, limit, featured} = {}){
+export async function fetchPosts({page, limit, featured, category, tag} = {}){
   const params = new URLSearchParams()
   if(page) params.set('page', page)
   if(limit) params.set('limit', limit)
   if(typeof featured !== 'undefined') params.set('featured', String(featured))
+  if(category) params.set('category', category)
+  if(tag) params.set('tag', tag)
 
   const url = `${API_BASE}/api/v1/posts?${params.toString()}`
   const res = await fetchJson(url)
