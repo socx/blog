@@ -14,8 +14,13 @@
     "dev:docker": "docker compose -f docker-compose.dev.yml up --build",
     "dev:docker:down": "docker compose -f docker-compose.dev.yml down --volumes --remove-orphans",
     "dev:docker:logs": "docker compose -f docker-compose.dev.yml logs --follow",
-    "start": "concurrently -n frontend,admin,api -c green,magenta,cyan \"npm --prefix frontend run dev\" \"npm --prefix frontend-admin run dev\" \"npm --prefix backend/api run dev\""
+    "start": "concurrently -n frontend,admin,api -c green,magenta,cyan \"npm --prefix frontend run dev\" \"npm --prefix frontend-admin run dev\" \"npm --prefix backend/api run dev\"",
+    "e2e:frontend": "npm --prefix frontend run test:e2e",
+    "e2e:admin": "npm --prefix frontend-admin run test:e2e",
+    "e2e": "npm run e2e:frontend && npm run e2e:admin",
+    "playwright:install": "npm --prefix frontend run playwright:install && npm --prefix frontend-admin run playwright:install"
   },
+  
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.3.1",
