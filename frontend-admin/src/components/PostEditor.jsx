@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getPost, updatePost, listCategories, listTags, setPostCategories, setPostTags, publishPost, unpublishPost, createCategory, createTag } from '../api/posts.js';
+import { getPost, updatePost, listCategories, listTags, setPostCategories, setPostTags, publishPost, unpublishPost, createCategory, createTag, uploadMedia } from '../api/posts.js';
 
 export default function PostEditor(){
   const { id } = useParams();
@@ -16,6 +16,7 @@ export default function PostEditor(){
   const [error, setError] = useState(null);
   const [publishing, setPublishing] = useState(false);
   const [publishedAtInput, setPublishedAtInput] = useState('')
+  const [uploading, setUploading] = useState(false);
 
   useEffect(()=>{
     let mounted = true;
@@ -58,6 +59,7 @@ export default function PostEditor(){
       } else if (post.published_at === null) {
         payload.published_at = null
       }
+      if (post && post.featured_media_id) payload.featured_media_id = post.featured_media_id;
       const updated = await updatePost(id, payload);
       setPost(updated.data);
       setMessage('Saved');
@@ -138,6 +140,31 @@ export default function PostEditor(){
         <div className="flex items-center gap-2">
           <input id="featured" type="checkbox" checked={!!post.featured} onChange={e=> setPost({...post, featured: e.target.checked})} />
           <label htmlFor="featured" className="text-sm">Featured</label>
+        </div>
+        <div className="mt-2">
+          <label className="block text-sm font-medium mb-1">Featured media</label>
+          {post.featured_media_url ? (
+            <div className="mb-2">
+              <img src={`${(import.meta.env.VITE_API_BASE || '')}${post.featured_media_url}`} alt="Featured" style={{maxWidth: '200px', maxHeight: '150px'}} />
+            </div>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <input type="file" accept="image/*" onChange={async (e) => {
+              const file = e.target.files && e.target.files[0];
+              if(!file) return;
+              setUploading(true); setError(null);
+              try {
+                const res = await uploadMedia(file);
+                const created = res && res.data ? res.data : res;
+                if (created) {
+                  setPost(p => ({ ...p, featured_media_id: created.id, featured_media_url: created.url }));
+                }
+              } catch (err) {
+                setError(err.message || String(err));
+              } finally { setUploading(false); }
+            }} />
+            {uploading ? <span className="text-sm">Uploading...</span> : null}
+          </div>
         </div>
         <button disabled={saving} className="bg-indigo-600 text-white px-3 py-1 rounded disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
       </form>
