@@ -33,7 +33,7 @@ export default function PostList(){
       .finally(()=> mounted && setLoading(false))
 
     return ()=> mounted = false
-  },[page, limit])
+  },[page, limit, category, tag])
 
   const totalPages = Math.max(1, Math.ceil(total / limit))
 
@@ -44,7 +44,7 @@ export default function PostList(){
           {posts.map(p=> (
             <li key={p.id} className="border-b border-slate-200 py-4">
               <div className="prose prose-sm">
-                <Link to={`/posts/${p.id}`} className="block">
+                <Link to={`/posts/${encodeURIComponent(p.slug || p.id)}`} className="block">
                   <h3 className="text-lg font-medium">{p.title}</h3>
                 </Link>
                 <p className="text-sm text-slate-600">{p.excerpt}</p>

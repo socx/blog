@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getPost, updatePost, listCategories, listTags, setPostCategories, setPostTags, publishPost, unpublishPost } from '../api/posts.js';
+import { getPost, updatePost, listCategories, listTags, setPostCategories, setPostTags, publishPost, unpublishPost, createCategory, createTag } from '../api/posts.js';
 
 export default function PostEditor(){
   const { id } = useParams();
@@ -9,6 +9,8 @@ export default function PostEditor(){
   const [tags, setTags] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newTagName, setNewTagName] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -17,7 +19,14 @@ export default function PostEditor(){
 
   useEffect(()=>{
     let mounted = true;
-    getPost(id).then(r=>{ if(mounted) setPost(r.data); }).catch(e=> setError(e.message));
+    getPost(id).then(r=>{ if(mounted) {
+      const p = r && r.data ? r.data : r;
+      setPost(p);
+      // initialize selected taxonomy if provided by API
+      if (Array.isArray(p.category_ids)) setSelectedCategories(p.category_ids.slice());
+      if (Array.isArray(p.tag_ids)) setSelectedTags(p.tag_ids.slice());
+    }}).catch(e=> setError(e.message));
+    // initialize published_at input when post loads
     // initialize published_at input when post loads
     getPost(id).then(r => {
       const p = r && r.data ? r.data : r
@@ -138,7 +147,7 @@ export default function PostEditor(){
         <div className="grid grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium mb-1">Categories</label>
-            <div className="space-y-1 max-h-48 overflow-auto border p-2">
+              <div className="space-y-1 max-h-48 overflow-auto border p-2">
               {categories.map(c => (
                 <label key={c.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" value={c.id} checked={selectedCategories.includes(c.id)} onChange={e=> {
@@ -148,10 +157,26 @@ export default function PostEditor(){
                 </label>
               ))}
             </div>
+              <div className="mt-2 flex gap-2">
+                <input className="border px-2 py-1 flex-1" placeholder="New category name" value={newCategoryName} onChange={e=>setNewCategoryName(e.target.value)} />
+                <button type="button" className="px-3 py-1 bg-slate-100 rounded" onClick={async ()=>{
+                  if(!newCategoryName || !newCategoryName.trim()) return;
+                  try{
+                    const slug = newCategoryName.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+                    const res = await createCategory({ name: newCategoryName.trim(), slug });
+                    const created = res && res.data ? res.data : res;
+                    if(created){
+                      setCategories(prev=>[...prev, created]);
+                      setSelectedCategories(prev=>[...prev, created.id]);
+                      setNewCategoryName('');
+                    }
+                  }catch(err){ setError(err.message || String(err)); }
+                }}>Add</button>
+              </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Tags</label>
-            <div className="space-y-1 max-h-48 overflow-auto border p-2">
+              <div className="space-y-1 max-h-48 overflow-auto border p-2">
               {tags.map(t => (
                 <label key={t.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" value={t.id} checked={selectedTags.includes(t.id)} onChange={e=> {
@@ -161,6 +186,22 @@ export default function PostEditor(){
                 </label>
               ))}
             </div>
+              <div className="mt-2 flex gap-2">
+                <input className="border px-2 py-1 flex-1" placeholder="New tag name" value={newTagName} onChange={e=>setNewTagName(e.target.value)} />
+                <button type="button" className="px-3 py-1 bg-slate-100 rounded" onClick={async ()=>{
+                  if(!newTagName || !newTagName.trim()) return;
+                  try{
+                    const slug = newTagName.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+                    const res = await createTag({ name: newTagName.trim(), slug });
+                    const created = res && res.data ? res.data : res;
+                    if(created){
+                      setTags(prev=>[...prev, created]);
+                      setSelectedTags(prev=>[...prev, created.id]);
+                      setNewTagName('');
+                    }
+                  }catch(err){ setError(err.message || String(err)); }
+                }}>Add</button>
+              </div>
           </div>
         </div>
         <button disabled={saving} className="bg-indigo-600 text-white px-3 py-1 rounded disabled:opacity-50">{saving ? 'Saving...' : 'Save Taxonomy'}</button>
