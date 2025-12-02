@@ -519,7 +519,11 @@ function buildApp(knex) {
     const uploadsDir = path.resolve(__dirname, '..', '..', 'uploads');
     const storage = multer.diskStorage({
       destination: (req, file, cb) => {
-        try { fs.mkdirSync(uploadsDir, { recursive: true }); } catch (e) {}
+        try {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        } catch (e) {
+          return cb(e);
+        }
         cb(null, uploadsDir);
       },
       filename: (req, file, cb) => {
