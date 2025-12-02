@@ -88,7 +88,7 @@ function removeUploadsDirIfSafe() {
       fs.rmSync(resolved, { recursive: true, force: true });
     } catch (e) {
       // older Node may not have fs.rmSync; fallback to rmdirSync
-      try { fs.rmdirSync(resolved, { recursive: true }); } catch (_) {}
+      try { fs.rmdirSync(resolved, { recursive: true }); } catch (_) { console.log('error');}
     }
   } catch (err) {
     console.warn('[teardown] failed to remove UPLOADS_DIR:', err && err.message ? err.message : err);
@@ -98,20 +98,12 @@ function removeUploadsDirIfSafe() {
 if (require.main === module) {
   dropTestDatabase()
     .then(() => {
-      try {
-        removeUploadsDirIfSafe();
-      } catch (e) {
-
-      }
+      try { removeUploadsDirIfSafe(); } catch (e) { console.log(e); }
       clearTimeout(safetyTimer);
       process.exit(0);
     })
     .catch(() => {
-      try {
-        removeUploadsDirIfSafe();
-      } catch (e) {
-
-      }
+      try { removeUploadsDirIfSafe(); } catch (e) { console.log(e); }
       clearTimeout(safetyTimer);
       // Exit 0 to avoid failing CI due to privilege constraints
       process.exit(0);
@@ -120,11 +112,7 @@ if (require.main === module) {
 
 if (require.main === module) {
   dropTestDatabase().then(() => {
-    try {
-      removeUploadsDirIfSafe(); 
-    } catch (e) {
-      
-    }
+    try { removeUploadsDirIfSafe(); } catch (e) { console.log(e); }
     process.exit(process.exitCode || 0);
   });
 }

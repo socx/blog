@@ -43,7 +43,7 @@ describe('Admin media upload (unit)', () => {
   test('POST /api/v1/admin/media stores file and inserts media row', async () => {
     // create a small temporary file to upload
     const tmpDir = path.resolve(__dirname, '..', 'tmp');
-    try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
+    try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) { console.warn(e); }
     const tmpFile = path.join(tmpDir, 'unit-upload.txt');
     fs.writeFileSync(tmpFile, 'unit test upload');
 
@@ -72,8 +72,8 @@ describe('Admin media upload (unit)', () => {
       uploadedPath = path.join(uploadsDir, uploadedFilename);
     } finally {
       // Cleanup uploaded and temporary files via shared helper
-      try { cleanup.removeIfExists(uploadedPath); } catch (e) {}
-      try { cleanup.removeIfExists(tmpFile); } catch (e) {}
+      try { cleanup.removeIfExists(uploadedPath); } catch (e) { console.warn(e); }
+      try { cleanup.removeIfExists(tmpFile); } catch (e) { console.warn(e); }
     }
   });
 });
