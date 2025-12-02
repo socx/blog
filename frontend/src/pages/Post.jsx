@@ -20,6 +20,14 @@ export default function Post(){
           setError('Not found')
           return
         }
+        // normalize content fields: backend stores `content`, UI expects `body`/`bodyHtml`
+        if (p && !p.body && p.content) {
+          // preserve raw content in `body` for older UI code
+          p.body = p.content
+        }
+        if (p && !p.bodyHtml && (p.content_html || p.contentHtml)) {
+          p.bodyHtml = p.content_html || p.contentHtml
+        }
         setPost(p)
         // basic SEO meta updates (title, description, canonical, og tags)
         try{
@@ -99,6 +107,10 @@ export default function Post(){
       ) : (
         <section>{post.body}</section>
       )}
+
+      <div className="mt-6">
+        <button className="px-3 py-1 bg-slate-100 rounded" onClick={() => window.history.length > 1 ? window.history.back() : null}>Go back</button>
+      </div>
     </article>
   )
 }
