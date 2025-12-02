@@ -320,6 +320,15 @@ jobs:
           echo "Running ESLint..."
           npm run lint
 
+      - name: Create uploads dir for tests
+        id: mk-uploads-dir
+        working-directory: ./
+        run: |
+          echo "Creating temporary uploads directory for CI tests"
+          UPLOADS_DIR=$(node ./backend/api/bin/mk-uploads-dir.js)
+          echo "uploads_dir=$UPLOADS_DIR" >> $GITHUB_OUTPUT
+          echo "Created uploads dir: $UPLOADS_DIR"
+
       - name: Run tests
         working-directory: ./backend/api
         env:
@@ -328,6 +337,9 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
           DB_NAME_TEST: ${{ secrets.DB_NAME_TEST }}
+          UPLOADS_DIR: ${{ steps.mk-uploads-dir.outputs.uploads_dir }}
+          CLEANUP_UPLOADS: 'true'
+          SERVE_UPLOADS: 'true'
         run: npm test
 
       - name: Audit DB grants (after)
