@@ -50,6 +50,7 @@ const cors = require('cors');
 const knexConfig = require('../db/knexfile');
 const Knex = require('knex');
 const { body, validationResult } = require('express-validator');
+const multer = require('multer');
 
 
 
@@ -60,10 +61,32 @@ const defaultKnex = Knex(knexConfigForEnv);
 
 function buildApp(knex) {
   const app = express();
-  app.use(helmet());
+  // Configure Helmet to set Cross-Origin-Resource-Policy once (avoid duplicate header sources)
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(morgan('dev'));
   app.use(cors());
+  // serve uploaded media files
+  try {
+    const uploadsPath = path.resolve(__dirname, '..', '..', 'uploads');
+    // Serve uploaded media files from the uploads directory.
+    // Rely on Helmet's Cross-Origin-Resource-Policy (configured above) rather than setting it manually here.
+    app.use('/uploads', express.static(uploadsPath));
+  } catch (e) {
+    console.warn('Failed to mount uploads static dir:', e && e.message ? e.message : e);
+  }
   app.use(express.json({ limit: '2mb' }));
+
+  // No custom header normalization middleware: prefer a single, explicit source of headers (Helmet)
+
+  // helper: absolute site base used to prefix media URLs
+  const siteBase = ((process.env.SITE_BASE_URL || process.env.VITE_API_BASE || 'http://localhost:4000') + '').replace(/\/$/, '');
+  function absoluteUrl(pathOrUrl) {
+    if (!pathOrUrl) return null;
+    const s = String(pathOrUrl);
+    if (/^https?:\/\//i.test(s)) return s;
+    if (s.startsWith('/')) return siteBase + s;
+    return siteBase + '/' + s;
+  }
 
   // Health
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -95,6 +118,8 @@ function buildApp(knex) {
           // Allow a small clock skew tolerance by comparing against NOW()+2s
           this.whereNull('published_at').orWhere('published_at', '<=', knex.raw('DATE_ADD(NOW(), INTERVAL 2 SECOND)'))
         });
+      // include featured media URL when available
+      q.leftJoin('media', 'media.id', 'posts.featured_media_id');
     } else {
       // fallback: we'll select and filter in JS below
       q = knex('posts').select('*');
@@ -135,15 +160,19 @@ function buildApp(knex) {
         'posts.featured as featured',
         'posts.meta_title as meta_title',
         'posts.meta_description as meta_description',
-        'posts.meta_image_url as meta_image_url'
+        'posts.meta_image_url as meta_image_url',
+        'posts.featured_media_id as featured_media_id',
+        'media.url as featured_media_url'
       ).orderBy('posts.published_at','desc');
     } else if (supportsNow) {
-      q.select('id','title','slug','excerpt','published_at','featured','meta_title','meta_description','meta_image_url').orderBy('published_at','desc');
+      q.select('posts.id','posts.title','posts.slug','posts.excerpt','posts.published_at','posts.featured','posts.meta_title','posts.meta_description','posts.meta_image_url','posts.featured_media_id','media.url as featured_media_url').orderBy('published_at','desc');
     }
 
     let posts;
     if (supportsNow) {
       posts = await q.limit(limit).offset(offset);
+      // prefix featured media urls with absolute base
+      posts = posts.map(p => ({ ...p, featured_media_url: absoluteUrl(p.featured_media_url) }));
       res.json({ data: posts, meta: { page, limit } });
     } else {
       // fallback: fetch all rows (mock returns via offset) then filter in JS
@@ -168,12 +197,17 @@ function buildApp(knex) {
     let post;
     if (supportsNow) {
       post = await knex('posts')
-        .where({ slug, status: 'published' })
+        .leftJoin('media', 'media.id', 'posts.featured_media_id')
+        .where({ 'posts.slug': slug, 'posts.status': 'published' })
         .where(function(){
           this.whereNull('published_at').orWhere('published_at', '<=', knex.raw('DATE_ADD(NOW(), INTERVAL 2 SECOND)'))
         })
+        .select('posts.*', 'media.url as featured_media_url')
         .first();
-      if (post) return res.json({ data: post });
+      if (post) {
+        post.featured_media_url = absoluteUrl(post.featured_media_url);
+        return res.json({ data: post });
+      }
     } else {
       // fallback for mocked knex in unit tests: fetch by slug/status and check published_at in JS
       const maybe = await knex('posts').where({ slug, status: 'published' }).first();
@@ -190,7 +224,7 @@ function buildApp(knex) {
       const map = await knex('post_slugs').where({ slug }).first();
       if (map && map.post_id) {
         const newPost = await knex('posts').where({ id: map.post_id, status: 'published' }).first();
-        if (newPost) {
+          if (newPost) {
           // respond with 301 and Location header to canonical post URL
           const siteBase = (process.env.SITE_BASE_URL || process.env.VITE_API_BASE || 'http://localhost:4000').replace(/\/$/, '');
           const loc = `${siteBase}/posts/${encodeURIComponent(newPost.slug)}`;
@@ -209,12 +243,14 @@ function buildApp(knex) {
   app.get('/api/v1/featured', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit || '6', 10), 50);
     const rows = await knex('posts')
-      .where({ status: 'published' })
-      .where('featured', true)
-      .select('id','title','slug','excerpt','published_at','featured','meta_title','meta_description','meta_image_url')
-      .orderBy('published_at', 'desc')
+      .leftJoin('media', 'media.id', 'posts.featured_media_id')
+      .where({ 'posts.status': 'published' })
+      .where('posts.featured', true)
+      .select('posts.id','posts.title','posts.slug','posts.excerpt','posts.published_at','posts.featured','posts.meta_title','posts.meta_description','posts.meta_image_url','posts.featured_media_id','media.url as featured_media_url')
+      .orderBy('posts.published_at', 'desc')
       .limit(limit);
-    res.json({ data: rows, meta: { limit } });
+    const rowsWithAbs = rows.map(r => ({ ...r, featured_media_url: absoluteUrl(r.featured_media_url) }));
+    res.json({ data: rowsWithAbs, meta: { limit } });
   });
 
   // Sitemap XML for published posts
@@ -478,6 +514,44 @@ function buildApp(knex) {
   });
 
   // mount admin router with auth
+  // Add media upload route on admin router before mounting
+  try {
+    const uploadsDir = path.resolve(__dirname, '..', '..', 'uploads');
+    const storage = multer.diskStorage({
+      destination: (req, file, cb) => {
+        try {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        } catch (e) {
+          return cb(e);
+        }
+        cb(null, uploadsDir);
+      },
+      filename: (req, file, cb) => {
+        const safe = Date.now() + '-' + Math.random().toString(36).slice(2,8) + path.extname(file.originalname || '');
+        cb(null, safe);
+      }
+    });
+    const upload = multer({ storage });
+
+    // POST /api/v1/admin/media - upload a single file
+    adminRouter.post('/media', upload.single('file'), async (req, res) => {
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      try {
+        const url = `/uploads/${req.file.filename}`;
+        const mime = req.file.mimetype || null;
+        const now = new Date();
+        const [id] = await knex('media').insert({ url, mime_type: mime, uploaded_by: req.user && req.user.id ? req.user.id : null, created_at: now });
+        const row = await knex('media').where({ id }).first();
+        return res.status(201).json({ data: row });
+      } catch (err) {
+        console.error('Failed to save uploaded media:', err && err.message ? err.message : err);
+        return res.status(500).json({ error: 'Failed to save media' });
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to register media upload route:', e && e.message ? e.message : e);
+  }
+
   app.use('/api/v1/admin', authenticateJWT, requireAdmin, adminRouter);
 
   // --- Taxonomy Routers (admin) ---

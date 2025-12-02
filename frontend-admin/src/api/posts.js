@@ -93,6 +93,17 @@ export async function createCategory(data){
   return json(res);
 }
 
+export async function uploadMedia(file){
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${API_BASE}/api/v1/admin/media`, {
+    method: 'POST',
+    headers: { ...authHeaders() },
+    body: fd
+  });
+  return json(res);
+}
+
 export async function createTag(data){
   const res = await fetch(`${API_BASE}/api/v1/admin/tags`, {
     method: 'POST',

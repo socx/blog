@@ -17,13 +17,13 @@
     "start": "concurrently -n frontend,admin,api -c green,magenta,cyan \"npm --prefix frontend run dev\" \"npm --prefix frontend-admin run dev\" \"npm --prefix backend/api run dev\""
   },
   "dependencies": {
-    "knex": "^2.5.1",
-    "mysql2": "^3.3.0",
     "bcryptjs": "^2.4.3",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "knex": "^2.5.1",
+    "mysql2": "^3.3.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22",
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.0.0",
+    "nodemon": "^2.0.22"
   }
 }
