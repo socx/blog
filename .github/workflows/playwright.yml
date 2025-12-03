@@ -1,0 +1,27 @@
+name: Playwright visual tests
+
+on:
+  pull_request:
+    paths:
+      - 'blog/frontend/**'
+      - '.github/workflows/playwright.yml'
+
+jobs:
+  playwright-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install frontend deps
+        run: npm ci --prefix frontend
+      - name: Build frontend
+        run: npm run build --prefix frontend
+      - name: Install Playwright browsers
+        run: cd frontend && npx playwright install --with-deps
+      - name: Run Playwright visual tests
+        run: npm run test:e2e --prefix frontend
+        env:
+          CI: true
